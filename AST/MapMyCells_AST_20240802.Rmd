@@ -1,0 +1,284 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r error=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(clustree)
+library(Seurat)
+library(patchwork)
+library(plyr)
+library(magrittr)
+library(tidyr)
+library(ggplot2)
+library(ggthemes)
+library(fs)
+library(roxygen2)
+library(utils)
+library(fs)
+library(knitr)
+library(purrr)
+library(reshape)
+library(ggplot2)
+library(matlab)
+library(matrixStats)
+library(cowplot)
+library(openxlsx)
+library(readxl)
+library(harmony)
+library(SoupX)
+library(DoubletFinder)
+library(ggpubr)
+library(pheatmap)
+library(dittoSeq)
+library(scales)
+library(gridExtra)
+library(stargazer)
+library(data.table)
+library(rmarkdown)
+library(monocle3)
+library(monocle)
+library(SeuratWrappers)
+library(monocle3) 
+library(monocle) 
+library(pheatmap)
+library(gprofiler2)
+library(stringr)
+library(RColorBrewer)
+library(moonBook)
+library(ggforce)
+library(yarrr)
+
+ basic.marker1 <- c( "Lepr", "Cemip", "Mag", "Pdgfra", "Gfap", "Slc1a2", "Ptprc", "Syt1", "Nrg1", "Tmem232", "Cux2", 'S100a8','Gad1', 'Slc17a7', 'Flt1', "Mbp", 'Tmem119', 'P2ry12', 'Trem2', 'Itgam', 'Itgax', 'Mecom', 'Pdgfrb', 'Acta2', 'Apoe', 'Top2a', 'Enpp6', 'Cspg4','Cd14')
+```
+# Function to save figures
+```{r}
+fig.path <- '/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/'
+
+fig.path.png <- '/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/1_PNG/AST'
+fig.path.png <- '/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/2_PDF/AST'
+
+save.fig <- function(fig.path,p.name) {
+ggsave(filename = paste0(fig.path.pdf, 
+                         p.name,'_',
+                         'GROUP.',resolution, "_",
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.PDF'), 
+       limitsize = F) 
+  
+  ggsave(filename = paste0(fig.path.png,
+                         p.name,'_',
+                         'GROUP.',resolution, "_",
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.png'), 
+       limitsize = F) 
+}
+  
+```
+# Functions for dotplots and feature plots split by a category with titles
+```{r}
+
+FPlist <- function(genes){
+    FeaturePlot(AST_T2T3, genes ,ncol = n.col,cols = c('grey90',paste0('#',c("4FB3AA","e9d8a6","ee9b00","ae2012"))),pt.size = 0.05, order = order.input) & NoAxes() 
+} #function to plot markers for each cluster 
+
+
+DPlist <- function(genes){
+   DotPlot(AST_T2T3,features=genes,group.by = 'RNA_snn_res.0.6', dot.scale = 6,cluster.idents = F,col.max = 1.5, col.min = -1.5)+
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+  scale_colour_gradient2(low = "#046A83", mid = "white",high = '#D26952',midpoint = 0) + theme_light()  + 
+  rotate_x_text(60) +
+    theme( plot.margin = margin(b = 0, r = 20),
+          legend.position = 'right',
+          axis.title.x = element_text(size = 0),
+          axis.title.y = element_text(size = 0)) +
+    geom_point(aes(size = pct.exp), alpha = 0.25, shape = 21, color="black", stroke = 0.75)+
+  FontSize(x.text = 12,y.text = 12) + coord_flip()
+} #function to plot markers for each cluster 
+```
+# Read data file 
+```{r}
+#AST_T2T3 <-readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/1_data.input/1_DTA/Cleaned_T2T3only/AST_T2T3_20240516.RDS')
+```
+
+# Map my cells 
+```{r set working directory}
+# Uncomment line below and replace bracketed text with path to downloaded files.
+setwd("/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST")
+```
+  
+#### Load the relevant libraries
+This workbook uses the libraries *anndata* and *Seurat*
+```{r load libraries, warnings=FALSE}
+# Install Seurat and anndata if needed
+list.of.packages <- c("anndata")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)>0) install.packages(new.packages)
+
+# Load Seurat and anndata
+suppressPackageStartupMessages({
+  library(Seurat)      # For reading droplet data sets and visualizing/comparing results
+  library(anndata)     # For writing h5ad files 
+})
+options(stringsAsFactors=FALSE)
+
+# Citing R libraries
+# citation("Seurat") # Note that the citation for any R library can be pulled up using the citation command. We encourage citation of R libraries as appropriate.
+```
+  
+With the above files in your current working directory and the above libraries loaded, the use case below can now be run.  
+  
+### Analysis of a library
+  
+**(If you already have an .h5ad file ready for upload, skip to step 4.)**
+  
+A common use case for analysis of single cell/nucleus transcriptomics is to collect data from one (or more) ports of a droplet-based scRNA-seq run.  After some QC steps, these are then clustered for defining cell types. This section describes how to start from a such a droplet-based sequencing run, transfer labels from mouse "10x scRNA-seq whole brain" data from the Allen Institute onto these cells using MapMyCells, and then visualize the results in a UMAP.  
+  
+#### 3. Output to h5ad format
+
+Now let's output the QC'ed data matrix into an h5ad file and output it to the current directory for upload to MapMyCells. Note that in anndata data structure the genes are saved as columns rather than genes so we need to transpose the matrix first.
+  
+```{r output library anndata}
+
+AST_T2T3_mat <- AST_T2T3@assays[["RNA"]]@counts
+dataQCt = Matrix::t(AST_T2T3_mat)
+
+# Convert to anndata format
+ad <- AnnData(
+  X = dataQCt,
+  obs = data.frame(group = rownames(dataQCt), row.names = rownames(dataQCt)),
+  var = data.frame(type = colnames(dataQCt), row.names = colnames(dataQCt))
+)
+
+# Write to compressed h5ad file
+write_h5ad(ad,'AST_T2T3.h5ad',compression='gzip')
+
+# Check file size. File MUST be <500MB to upload for MapMyCells
+print(paste("Size in MB:",round(file.size("AST_T2T3.h5ad")/2^20)))
+``` 
+  
+#### 4. Assign cell types using MapMyCells 
+  
+These next steps are performed OUTSIDE of R in the MapMyCells web application.  
+
+![](MapMyCells.png){Width=65%}
+
+The steps to MapMyCells are as follows:
+
+1. Go to (https://knowledge.brain-map.org/mapmycells/process/).  
+2. (Optional) Log in to MapMyCells.  
+3. Upload 'droplet_library.h5ad' to the site via the file system or drag and drop (Step 1).  
+4. Choose "10x Whole Mouse Brain (CCN20230722)" as the "Reference Taxonomy" (Step 2).  
+5. Choose the desired "Mapping Algorithm" (in this case "Hierarchical Mapping").  
+6. Click "Start" and wait ~5 minutes. (Optional) You may have a panel on the left that says "Map Results" where you can also wait for your run to finish.  
+7. When the mapping is complete, you will have an option to download the "tar" file with mapping results.  If your browser is preventing popups, search for small folder icon to the right URL address bar to enable downloads.  
+8. Unzip this file, which will contain three files: "validation_log.txt", "[NUMBER].json", and "[NUMBER].csv".  [NUMBER].csv contains the mapping results, which you need. The validation log will give you information about the the run itself and the json file will give you extra information about the mapping (you can ignore both of these files if the run completes successfully).  
+9. Copy [NUMBER].csv to your current working directory and rename it "droplet_library_mapping.csv").  
+10. You can now go back to R and continue the script below.  
+  
+#### 5. Read mapping results into R
+  
+Let's now look at the output results from the hierarchical clustering algorithm.  We can read this into R using read.csv, but note that the first four lines contain metadata that need to be skipped.  
+  
+```{r read library mapping results}
+mapping <- read.csv("/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_10xWholeMouseBrain(CCN20230722)_HierarchicalMapping_UTC_1722650425776/AST_T2T3_10xWholeMouseBrain(CCN20230722)_HierarchicalMapping_UTC_1722650425776.csv",comment.char="#")
+head(data.frame(mapping))
+```   
+  
+MapMyCells maps input cells to the taxonomy at four increasing levels of resolution from coarsest class, to intermediate subclass, and supertype, and finest cluster. In the mouse whole brain taxonomy there are 32 classes, 306 subclasses, 1,045 supertypes and 5,200 clusters.   
+  
+The file consists of the following columns:
+
+* *cell_id* = the cell identifiers for your cells included in the initial h5ad files  
+* *class_label* = the unique identifier for the best mapping class  
+* *class_name* = the name of the best mapping class  
+* *class_bootstrapping_probability* = fraction of bootstrapping runs that the cell mapped to the above class (higher numbers are better, with 1 being the best)  
+and similar fields for subclass, supertype, and cluster.  For finest level *cluster* there is an additional field  
+* *cluster_alias* = another unique identifier for the cluster  
+  
+#### 6. Review top classes
+  
+As this library was selected from a dissection of primary motor cortex (MOp), we expect the majority of cells to map to cell types found in MOp.  Let's check!  
+
+Now let's visualize the mapping results.  We will do this by saving the data in a Seurat object with (modified) mapping results as metadata, running the standard pipeline for creating a UMAP in Seurat, and then color-coding each cell.  
+  
+```{r define modified mapping, warning=FALSE}
+# Assign rare classes and subclasses as "other"
+mapping$class_new <- mapping$class_name
+ mapping$class_new[!is.element(mapping$class_name,names(head(-sort(-table(mapping$class_name)),5)))] = "other"
+ mapping$class_new[which(mapping$class_bootstrapping_probability <.75)] = "Probability < 0.75"
+
+mapping$subclass_new <- mapping$subclass_name
+mapping$subclass_new[!is.element(mapping$subclass_name,names(head(-sort(-table(mapping$subclass_name)),12)))] = "other"
+mapping$subclass_new[which(mapping$subclass_bootstrapping_probability <.75)] = "Probability < 0.75"
+
+mapping$cluster_new <- mapping$cluster_name
+mapping$cluster_new[!is.element(mapping$cluster_name,names(head(-sort(-table(mapping$cluster_name)),12)))] = "other"
+mapping$cluster_new[which(mapping$cluster_bootstrapping_probability <.75)] = "Probability < 0.75"
+
+mapping$supertype_new <- mapping$supertype_name
+mapping$supertype_new[!is.element(mapping$supertype_name,names(head(-sort(-table(mapping$supertype_name)),20)))] = "other"
+#mapping$supertype_new[which(mapping$supertype_bootstrapping_probability <.75)] = "Probability < 0.75"
+
+
+# Put row.names as data colnames and the order to match the data
+rownames(mapping) <- mapping$cell_id
+mapping <- mapping[colnames(AST_T2T3_mat),]
+
+# Create the Seurat object
+dataSeurat <- AST_T2T3
+dataSeurat@meta.data <- cbind(dataSeurat@meta.data,mapping)
+```   
+ 
+   
+```{r view library top classes}
+# View the top classes
+data.frame(Cell_counts=head(sort(table(mapping$class_new),decreasing=T),20))
+data.frame(Cell_counts=head(sort(table(mapping$cluster_name),decreasing=T),20))
+
+library(dplyr)
+dataSeurat@meta.data %>%
+  group_by(IL15_annotation.short, subclass_new) %>%
+  dplyr::summarize(count=n()) %>%
+  filter(IL15_annotation.short == 'NonTel.DTA.3')
+
+clust <- dataSeurat@meta.data[which(dataSeurat$IL15_annotation.short %in% c('NonTel.DTA.3')),]
+clust.table <- data.frame(Cell_counts=sort(table(clust$subclass_new),decreasing=T))
+hist(clust$subclass_bootstrapping_probability) 
+
+mean(clust.table$Cell_counts.Freq)
+``` 
+
+Now let's make the plot for classes!  
+  
+```{r plot the umap classes, fig.height=4, fig.width=10}
+DimPlot(dataSeurat, group.by="IL15_annotation.3", split.by="subclass_new", label=F, repel = T, ncol = 4, pt.size =.5) + NoAxes() 
+```
+
+```{r fig.height=3, fig.width=7}
+FeaturePlot(dataSeurat,features = c('class_bootstrapping_probability'),cols = c("#ae2012",'grey90'),blend= F, pt.size = 0.6) &NoAxes() | FeaturePlot(dataSeurat,features = c('subclass_bootstrapping_probability'),cols = c("#ae2012",'grey90'),blend= F, pt.size = 0.6) &NoAxes()
+FeaturePlot(dataSeurat,features = c('supertype_bootstrapping_probability'),cols = c("#ae2012",'grey90'),blend= F, pt.size = 0.6) &NoAxes()
+
+DimPlot(dataSeurat, group.by="subclass_new", label=F, repel = T, pt.size =.5,cols = c('royalblue','springgreen4','snow2','lightgrey','violetred','goldenrod','red')) + NoAxes() | DimPlot(dataSeurat, group.by="IL15_annotation.short", label=F, repel = T, pt.size =.5) + NoAxes()
+
+DimPlot(dataSeurat, group.by="supertype_new", label=F, repel = T, pt.size =.5,cols = c('orange','lightsteelblue1','skyblue3','mediumpurple','thistle','darkslateblue','green','deeppink')) + NoAxes() | DimPlot(dataSeurat, group.by="IL15_annotation.short", label=F, repel = T, pt.size =.5) + NoAxes()
+```   
+```{r}
+DimPlot(dataSeurat, group.by="supertype_new", label=F, repel = T, pt.size =.5, cols = ) + NoAxes() 
+DimPlot(dataSeurat, group.by="cluster_new", label=F, repel = T, pt.size =.5, cols = ) + NoAxes() 
+```
+
+```{r fig.height=6, fig.width=6}
+DimPlot(dataSeurat, group.by="IL15_annotation.short", split.by="cluster_new", label=F, repel = T, ncol = 4, pt.size =.5) + NoAxes() 
+
+DimPlot(dataSeurat, group.by="IL15_annotation.short", split.by="supertype_new", label=F, repel = T, ncol = 4, pt.size =.5) + NoAxes() 
+```
+  
+```{r plot the histograms, fig.height=2, fig.width=3}
+hist(dataSeurat$class_bootstrapping_probability) 
+hist(dataSeurat$subclass_bootstrapping_probability)
+
+table(dataSeurat$subclass_bootstrapping_probability)
+``` 
+  

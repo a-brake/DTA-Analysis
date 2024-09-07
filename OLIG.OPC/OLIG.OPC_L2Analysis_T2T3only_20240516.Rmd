@@ -1,0 +1,759 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Olig + OPC object was made in '/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/scripts/06_L2Analysis.OLIG_b1234.nb.Rmd'. 
+
+```{r message = FALSE, error = FALSE, warning = FALSE,results= 'hide'}
+library(dplyr)
+library(clustree)
+library(Seurat)
+library(patchwork)
+library(plyr)
+library(magrittr)
+library(tidyr)
+library(ggplot2)
+library(ggthemes)
+library(fs)
+library(roxygen2)
+library(utils)
+library(fs)
+library(knitr)
+library(purrr)
+library(reshape)
+library(ggplot2)
+library(matlab)
+library(matrixStats)
+library(cowplot)
+library(openxlsx)
+library(readxl)
+library(harmony)
+library(SoupX)
+library(DoubletFinder)
+library(ggpubr)
+library(pheatmap)
+library(dittoSeq)
+library(scales)
+library(gridExtra)
+library(stargazer)
+library(data.table)
+library(rmarkdown)
+library(monocle3)
+library(monocle)
+library(SeuratWrappers)
+library(monocle3)
+library(monocle)
+library(pheatmap)
+library(gprofiler2)
+library(stringr)
+library(RColorBrewer)
+library(moonBook)
+library(ggforce)
+library(yarrr)
+library(clustree)
+
+ basic.marker1 <- c( "Lepr", "Cemip", "Mag", "Pdgfra", "Gfap", "Slc1a2", "Ptprc", "Syt1", "Nrg1", "Tmem232", "Cux2", 'S100a8','Gad1', 'Slc17a7', 'Flt1', "Mbp", 'Tmem119', 'P2ry12', 'Trem2', 'Itgam', 'Itgax', 'Mecom', 'Pdgfrb', 'Acta2', 'Apoe', 'Top2a', 'Enpp6', 'Cspg4','Cd14')
+
+colorsp.new <- colorRampPalette(paste0('#',c("f7b99b","e88da0","73c9e8","b1d29d","f9d28b","72b6e4")))
+ 
+ color.match <- colorRampPalette(paste0('#',c("f7bba1","e99ca4","b2aec6","8fccd6","b5d5a3","e7d597"))) ## Use this for L1 object
+ 
+ color.test <- colorRampPalette(paste0('#',c("E6735A","3d5467","779fa1","FCDE9C","564154","af5d63"))) ## Use this for MIC object
+ 
+ `%notin%` <- Negate(`%in%`)
+ 
+ draw_colnames_45 <- function (coln, gaps, ...) {
+    coord <- pheatmap:::find_coordinates(length(coln), gaps)
+    x     <- coord$coord - 0.5 * coord$size
+    res   <- grid::textGrob(
+      coln, x = x, y = unit(1, "npc") - unit(3,"bigpts"),
+      vjust = 0.75, hjust = 1, rot = 45, gp = grid::gpar(...)
+    )
+    return(res)
+}
+assignInNamespace(
+  x = "draw_colnames",
+  value = "draw_colnames_45",
+  ns = asNamespace("pheatmap")
+)
+
+OneDrive_PDF.PNG <- function(p.name){
+  ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/2_PDF/OLIG/',
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.PDF'),
+       limitsize = F)  
+
+  
+  ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/1_PNG/OLIG/',
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.png'),
+       limitsize = F)  
+}
+
+`%notin%` <- Negate(`%in%`)
+
+```
+
+```{r Generate merged objects from orig code}
+
+# ##########  OLIG #############
+# popko.OLIG.1 <- readRDS('/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/data/rda/04_HarmonyIntegrate/popko_L1_OLIG_20210927.RDS') #previously recevied data
+# 
+# popko.OLIG.2 <- readRDS('/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/data/rda/04_HarmonyIntegrate/popko_L1_OLIG_20220103.RDS') # OLIC from 12.01.2021 dataset 
+# 
+# #merge OLIG.1 and OLIG.2
+# OLIG_merged <- merge(popko.OLIG.1, y = popko.OLIG.2,
+#                       project = "popko")
+# 
+# 
+# ######## OPC #############
+# popko.OPC.1 <- readRDS('/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/data/rda/04_HarmonyIntegrate/popko_L1_OPC_20210927.RDS') #previously recevied data
+# 
+# popko.OPC.2 <- readRDS('/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/data/rda/04_HarmonyIntegrate/popko_L1_OPC_20220103.RDS') # OLIC from 12.01.2021 dataset 
+# 
+# #merge OLIG.1 and OLIG.2
+# OPC_merged <- merge(popko.OPC.1, y = popko.OPC.2,
+#                       project = "popko")
+# 
+# ######## merge OLIG and OPC ############
+# OLIG_OPC <- merge(OPC_merged, y = OLIG_merged,
+#                       project = "popko")
+```
+
+```{r read in files}
+popko.OLIG <-  readRDS('/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/data/rda/06_L2.Analysis/L2.all/06_OLIG/OLIG_merged_all_precleaning_v1_20220127.RDS')
+
+popko.OPC <-  readRDS('/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/data/rda/06_L2.Analysis/L2.all/06_OPC/OPC_merged_all_precleaning_v1_20220127.RDS')
+
+OLIG_OPC <- merge(popko.OLIG, y = popko.OPC,
+                      project = "popko")
+
+
+OLIG.sub <-  readRDS('/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/data/rda/06_L2.Analysis/L2.all/06_OLIG/OLIG_all_cleaned_20220304.RDS')
+
+OPC.sub2 <-  readRDS('/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/data/rda/06_L2.Analysis/L2.all/06_OPC/OPC_all_cleaned_20220304.RDS')
+
+
+```
+
+```{r Basic Seurat}
+OLIG_OPC <- OLIG_OPC  %>%
+    PercentageFeatureSet(pattern = "^mt-", col.name = "percent.mt") %>%
+    NormalizeData(normalization.method = "LogNormalize",verbose = FALSE,scale.factor = 10000) %>%
+    FindVariableFeatures(selection.method = "vst", nfeatures = 3000) %>%
+    ScaleData(verbose = FALSE) %>%
+    RunPCA(npcs = 50, verbose = FALSE) %>%
+    RunHarmony("IL01_uniqueID", plot_convergence = TRUE) %>%
+    RunUMAP(reduction = "harmony", dims = 1:8, min.dist=0.001, spread = 5,n.components = 2) %>% #1:5
+    FindNeighbors(reduction = "harmony", dims = 1:8) %>% #1:5
+    FindClusters(resolution = c(0.1, 0.2, 0.4, 0.6,0.8,1,1.2)) %>%
+    identity()
+```
+
+```{r Index Label Update}
+index_labels <- read_excel('/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/data/index_labels_b1_b2_b3_b4.xlsx', sheet = 'IndexLabels')
+
+OLIG_OPC$IL08_condition.6 <- ''
+OLIG_OPC$IL08_condition.6[which(OLIG_OPC$IL08_condition %in% c('3w'))] <-  'T1_Onset'
+OLIG_OPC$IL08_condition.6[which(OLIG_OPC$IL08_condition %in% c('5w','~6.28w'))] <-  'T2_Peak'
+OLIG_OPC$IL08_condition.6[which(OLIG_OPC$IL08_condition %in% c('17w'))] <-  'T3_Recovery'
+OLIG_OPC$IL08_condition.6[which(OLIG_OPC$IL08_condition %in% c('~45w'))] <-  'T4_LateOnset'
+
+OLIG_OPC$IL08_condition.6 <- factor(OLIG_OPC$IL08_condition.6)
+
+OLIG_OPC$IL08_condition.5 <- ""
+OLIG_OPC$IL08_condition.5 <- paste0(OLIG_OPC$IL08_condition.2,"_",OLIG_OPC$IL08_condition)
+
+OLIG_OPC$IL08_condition.5 <- factor(OLIG_OPC$IL08_condition.5, levels =c('ctrl_3w','DTA_3w','ctrl_5w', 'DTA_~6.28w','ctrl_17w', 'DTA_17w','ctrl_~45w','DTA_~45w'))
+
+OLIG_OPC$IL08_condition.7 <- ""
+OLIG_OPC$IL08_condition.7 <- paste0(OLIG_OPC$IL08_condition.6,"_",OLIG_OPC$IL08_condition.2)
+
+OLIG_OPC$IL08_condition.7 <- factor(OLIG_OPC$IL08_condition.7,levels =c('T1_Onset_ctrl','T2_Peak_ctrl','T3_Recovery_ctrl', 'T4_LateOnset_ctrl','T1_Onset_DTA','T2_Peak_DTA','T3_Recovery_DTA', 'T4_LateOnset_DTA'))
+
+OLIG_OPC$IL08_condition.8 <- ""
+OLIG_OPC$IL08_condition.8 <- paste0(OLIG_OPC$IL08_condition.7,"_",OLIG_OPC$IL06_tissue.1)
+
+OLIG_OPC$IL08_condition.8 <- factor(OLIG_OPC$IL08_condition.8,levels =c('T1_Onset_ctrl_GM','T2_Peak_ctrl_GM','T3_Recovery_ctrl_GM', 'T4_LateOnset_ctrl_GM','T1_Onset_DTA_GM','T2_Peak_DTA_GM','T3_Recovery_DTA_GM', 'T4_LateOnset_DTA_GM','T1_Onset_ctrl_WM','T2_Peak_ctrl_WM','T3_Recovery_ctrl_WM', 'T4_LateOnset_ctrl_WM','T1_Onset_DTA_WM','T2_Peak_DTA_WM','T3_Recovery_DTA_WM', 'T4_LateOnset_DTA_WM'))
+
+### UPDATE INDEX LABELS
+
+for(ii in OLIG_OPC@meta.data$IL01_uniqueID){
+row.index <- which(index_labels$IL01_uniqueID == ii)
+cell.index <- which(OLIG_OPC@meta.data$IL01_uniqueID == ii)
+OLIG_OPC@meta.data$IL02_species[cell.index] <- as.character(index_labels[row.index, "IL02_species"])
+OLIG_OPC@meta.data$IL03_source.1[cell.index] <- as.character(index_labels[row.index, "IL03_source.1"])
+OLIG_OPC@meta.data$IL03_source.2[cell.index] <- as.character(index_labels[row.index, "IL03_source.2"])
+OLIG_OPC@meta.data$IL04_sex[cell.index] <- as.character(index_labels[row.index, "IL04_sex"])
+OLIG_OPC@meta.data$IL05_ageDays[cell.index] <- as.character(index_labels[row.index, "IL05_ageDays"])
+OLIG_OPC@meta.data$IL05_ageDays.1[cell.index] <- as.character(index_labels[row.index, "IL05_ageDays.1"])
+OLIG_OPC@meta.data$IL05_ageDays.2[cell.index] <- as.character(index_labels[row.index, "IL05_ageDays.2"])
+OLIG_OPC@meta.data$IL06_tissue.1[cell.index] <- as.character(index_labels[row.index, "IL06_tissue.1"])
+OLIG_OPC@meta.data$IL06_tissue.2[cell.index] <- as.character(index_labels[row.index, "IL06_tissue.2"])
+OLIG_OPC@meta.data$IL06_tissue.3[cell.index] <- as.character(index_labels[row.index, "IL06_tissue.3"])
+OLIG_OPC@meta.data$IL07_location[cell.index] <- as.character(index_labels[row.index, "IL07_location"])
+OLIG_OPC@meta.data$IL08_condition[cell.index] <- as.character(index_labels[row.index, "IL08_condition"])
+OLIG_OPC@meta.data$IL08_condition.1[cell.index] <- as.character(index_labels[row.index, "IL08_condition.1"])
+OLIG_OPC@meta.data$IL08_condition.2[cell.index] <- as.character(index_labels[row.index, "IL08_condition.2"])
+OLIG_OPC@meta.data$IL09_ilumina[cell.index] <- as.character(index_labels[row.index, "IL09_ilumina"])
+OLIG_OPC@meta.data$IL10_chemistry[cell.index] <- as.character(index_labels[row.index, "IL10_chemistry"])
+OLIG_OPC@meta.data$IL11_batch[cell.index] <- as.character(index_labels[row.index, "IL11_batch"])
+OLIG_OPC@meta.data$IL12_LMinDays[cell.index] <- as.character(index_labels[row.index, "IL12_LMinDays"])
+OLIG_OPC@meta.data$IL13_LmaxDays[cell.index] <- as.character(index_labels[row.index, "IL13_LmaxDays"])
+OLIG_OPC@meta.data$IL14_dataset[cell.index] <- as.character(index_labels[row.index, "IL14_dataset"])
+OLIG_OPC@meta.data$IL16_note[cell.index] <- as.character(index_labels[row.index, "IL16_note"])
+
+}
+
+```
+
+```{r DimPlot at all resolutions fig.height=12, fig.width=12}
+
+resolution = paste0('RNA_snn_res.',c(0.1, 0.2, 0.4, 0.6,0.8,1,1.2))
+
+dimplot.all <- list()
+
+for(ii in resolution){
+dimplot.all[[ii]] <- DimPlot(OLIG_OPC,group.by = ii,label = T) + NoAxes() + NoLegend() + labs(title = ii)
+}
+
+p.name <- paste0('DimPlot.All')
+
+nCol <- ceiling(sqrt(length(resolution)))
+
+# do.call("plot_grid", c(dimplot.all,ncol = nCol))
+#               
+#   ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/2_PDF/OLIG/',
+#                          p.name,'_',
+#                          format(Sys.Date(), "%Y%m%d"),
+#                          '.PDF'),
+#        limitsize = F)  
+#   
+#   do.call("plot_grid", c(dimplot.all,ncol = nCol))
+#   
+#   ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/1_PNG/OLIG/',
+#                          p.name,'_',
+#                          format(Sys.Date(), "%Y%m%d"),
+#                          '.png'),
+#        limitsize = F)  
+```
+
+```{r fig.height=12, fig.width=12}
+resolution <- 'RNA_snn_res.0.4'
+DimPlot(OLIG_OPC, split.by = 'IL08_condition.8',group.by = resolution,label = T, ncol =4) + NoAxes() + NoLegend() + labs(title = resolution)
+```
+
+## 9,10, 11 look suspicious res 0.4
+```{r fig.height=4, fig.width=12}
+FeaturePlot(OLIG_OPC, c('Trem2','Gfap','Ptprc'), ncol = 3) & NoAxes() & NoLegend()
+FeaturePlot(OLIG_OPC, c('Mag','Mbp','Pdgfra'), ncol = 3) & NoAxes() & NoLegend()
+FeaturePlot(OLIG_OPC, c('Tafa5'), ncol = 3) & NoAxes() & NoLegend()
+```
+
+
+```{r fig.height=12, fig.width=14}
+FeaturePlot(OLIG_OPC, basic.marker1, ncol = 6) & NoAxes() & NoLegend()
+```
+
+```{r fig.height=10, fig.width=10}
+clustree(OLIG_OPC,prefix = "RNA_snn_res." )
+```
+
+### Investigate Res 0.4 cluster 9,10, 11 
+
+```{r fig.height=7, fig.width=12}
+resolution <- 'RNA_snn_res.0.6'
+
+count <- VlnPlot(OLIG_OPC,feature = "nCount_RNA",group.by = resolution,pt.size =0,ncol = 1,cols = colorsp.new(length(levels(OLIG_OPC@meta.data[[resolution]])))) + theme(text = element_text(size = 12)) + stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,geom = "crossbar", width = 0.5) #+ ylim(c(0 ,30000))
+mt <- VlnPlot(OLIG_OPC,feature = "percent.mt",group.by = resolution,pt.size =0,ncol = 1,cols = colorsp.new(length(levels(OLIG_OPC@meta.data[[resolution]])))) + theme(text = element_text(size = 12)) + stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,geom = "crossbar", width = 0.5) #+ ylim(c(0 ,5))
+feat <- VlnPlot(OLIG_OPC,feature = "nFeature_RNA",group.by = resolution,pt.size =0,ncol = 1,cols = colorsp.new(length(levels(OLIG_OPC@meta.data[[resolution]])))) + theme(text = element_text(size = 12)) + stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,geom = "crossbar", width = 0.5) #+ ylim(c(0 ,3000))
+
+(count / mt / feat) & NoLegend() | DimPlot(object = OLIG_OPC, reduction = "umap", pt.size = .05, group.by = resolution ,label = TRUE,label.size = 5,cols =colorsp.new(length(levels(OLIG_OPC@meta.data[[resolution]]))))  + labs(title = "After Harmony")+ theme_void() + NoLegend()
+
+```
+
+```{r eval=FALSE, include=FALSE}
+Idents(OLIG_OPC) <- OLIG_OPC$RNA_snn_res.0.6
+
+min <- 0.5
+
+cluster12.marker <- FindMarkers(OLIG_OPC, ident.1 = '12', min.pct = min) 
+cluster14.marker <- FindMarkers(OLIG_OPC, ident.1 = '14', min.pct = min) 
+cluster15.marker <- FindMarkers(OLIG_OPC, ident.1 = '15', min.pct = min) 
+
+```
+
+```{r fig.height=8, fig.width=9}
+n.to.include <- 5
+DotPlot(OLIG_OPC,features=unique(c(
+                                            head(row.names(cluster12.marker),n.to.include),
+                                            head(row.names(cluster14.marker),n.to.include),
+                                            head(row.names(cluster15.marker),n.to.include)
+                                            )),group.by = resolution, dot.scale = 8)+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) + coord_flip()  + 
+  scale_colour_gradient2(low = "#046A83", mid = "white",high = '#D26952',midpoint = 0) + theme_light() # other blue: 55747F  4C98AB 
+
+DotPlot(OLIG_OPC,features=basic.marker1,group.by = resolution, dot.scale = 8)+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) + coord_flip()  + 
+  scale_colour_gradient2(low = "#046A83", mid = "white",high = '#D26952',midpoint = 0) + theme_light() # other blue: 55747F  4C98AB 
+
+```
+
+```{r}
+DimPlot(OLIG_OPC,group.by = 'IL15_annotation',label = T) + NoAxes() + NoLegend() | DimPlot(OLIG_OPC,group.by = 'RNA_snn_res.0.3',label = T) + NoAxes() + NoLegend() 
+```
+
+```{r fig.height=5, fig.width=12}
+OPC.marker <- c('Pdgfra','Cspg4','Mag','Cnp')
+pre_myelinating_myelinating.marker <- c('Plp1','Zfp191','Zfp488','Zfp536','Sox17','Nkx6-2','Smarca4','Cd82','Tfr','Mal')
+myelinating.marker <- c('Bmp4','Enpp4','Aspa','Tmem10','Mog')
+all_OPClineage.marker <- c('Sox10','Olig1', "Olig2",'Nkx2-2','Cd9')
+
+FeaturePlot(OLIG_OPC.sub.rm12only, features = OPC.marker, ncol = 4, order = TRUE)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = myelinating.marker, ncol = 5, order = TRUE)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = all_OPClineage.marker, ncol = 5, order = TRUE)
+
+
+FeaturePlot(OLIG_OPC.sub.rm12only, features = OPC.marker, ncol = 4, order = FALSE)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = myelinating.marker, ncol = 5, order = FALSE)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = all_OPClineage.marker, ncol = 5, order = FALSE)
+
+FeaturePlot(OLIG_OPC.sub.rm12only, features = pre_myelinating_myelinating.marker, ncol = 5, order = TRUE)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = pre_myelinating_myelinating.marker, ncol = 5, order = FALSE)
+```
+
+```{r fig.height=20, fig.width=20}
+olig.markers <- read_xlsx('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/1_data.input/MarkerComparison/Marques_2016_aaf6463_table_s1_edit.xlsx')
+FeaturePlot(OLIG_OPC.sub.rm12only, features = olig.markers$OPC, ncol = 8, order = TRUE)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = olig.markers$`Early stages`, ncol = 8, order = TRUE)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = olig.markers$COP, ncol = 8, order = TRUE)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = olig.markers$`NFOL1/2`, ncol = 8, order = TRUE)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = olig.markers$`MFOL1/2`, ncol = 8, order = TRUE)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = olig.markers$`MOL1-6`, ncol = 8, order = TRUE)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = olig.markers$`MOL5/6`, ncol = 8, order = TRUE)
+
+
+FeaturePlot(OLIG_OPC.sub.rm12only, features = olig.markers$OPC, ncol = 8, order = F)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = olig.markers$`Early stages`, ncol = 8, order = F)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = olig.markers$COP, ncol = 8, order = F)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = olig.markers$`NFOL1/2`, ncol = 8, order = F)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = olig.markers$`MFOL1/2`, ncol = 8, order = F)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = olig.markers$`MOL1-6`, ncol = 8, order = F)
+FeaturePlot(OLIG_OPC.sub.rm12only, features = olig.markers$`MOL5/6`, ncol = 8, order = F)
+```
+
+```{r fig.height=24, fig.width=24}
+markers = c('OPC', 'Early stages','COP',"NFOL1/2", "MFOL1/2",'MOL1-6','MOL5/6')
+
+dimplot.all <- list()
+
+for(ii in markers){
+dimplot.all[[ii]] <- DotPlot(OLIG_OPC.sub.rm12only,features=olig.markers[ii],group.by = 'RNA_snn_res.0.4', dot.scale = 6,cluster.idents = F,col.max = 1.5, col.min = -1.5)+
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+  scale_colour_gradient2(low = "#046A83", mid = "white",high = '#D26952',midpoint = 0) + theme_light()  + 
+  rotate_x_text(60) +
+    theme( plot.margin = margin(b = 0, r = 20),
+          legend.position = 'right',
+          axis.title.x = element_text(size = 0),
+          axis.title.y = element_text(size = 0)) +
+    geom_point(aes(size = pct.exp), alpha = 0.25, shape = 21, color="black", stroke = 0.75)+
+  FontSize(x.text = 12,y.text = 12) + coord_flip()
+} #function to plot markers for each cluster 
+
+
+p.name <- paste0('DotPlot.OLigOPC.rm12only_OLIGMARKERS')
+
+nCol <- 4
+
+do.call("plot_grid", c(dimplot.all,ncol = nCol))
+              
+  ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/2_PDF/OLIG/',
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.PDF'),
+       limitsize = F)  
+  
+  do.call("plot_grid", c(dimplot.all,ncol = nCol))
+  
+  ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/1_PNG/OLIG/',
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.png'),
+       limitsize = F)  
+  
+  
+```
+
+
+```{r}
+# # Just OPCs
+OPC <- subset(OLIG_OPC,subset = RNA_snn_res.0.6 %in% c(4,16,9,11,14, 14),invert = FALSE)
+
+# Remove low quality: clusters 12, 14, 15
+OLIG_OPC.sub <- subset(OLIG_OPC,subset = RNA_snn_res.0.6 %in% c(12,14,15),invert = TRUE)
+
+# Remove low quality: clusters 12
+OLIG_OPC.sub.rm12only <- subset(OLIG_OPC,subset = RNA_snn_res.0.6 %in% c(12),invert = TRUE)
+```
+
+```{r}
+OPC <- OPC  %>%
+    PercentageFeatureSet(pattern = "^mt-", col.name = "percent.mt") %>%
+    NormalizeData(normalization.method = "LogNormalize",verbose = FALSE,scale.factor = 10000) %>%
+    FindVariableFeatures(selection.method = "vst", nfeatures = 3000) %>%
+    ScaleData(verbose = FALSE) %>%
+    RunPCA(npcs = 50, verbose = FALSE) %>%
+    RunHarmony("IL01_uniqueID", plot_convergence = TRUE) %>%
+    RunUMAP(reduction = "harmony", dims = 1:8, min.dist=0.001, spread = 5,n.components = 2) %>% #1:5
+    FindNeighbors(reduction = "harmony", dims = 1:8) %>% #1:5
+    FindClusters(resolution = c(0.1, 0.2, 0.4, 0.6,0.8)) %>%
+    identity()
+
+OLIG_OPC.sub <- OLIG_OPC.sub  %>%
+    PercentageFeatureSet(pattern = "^mt-", col.name = "percent.mt") %>%
+    NormalizeData(normalization.method = "LogNormalize",verbose = FALSE,scale.factor = 10000) %>%
+    FindVariableFeatures(selection.method = "vst", nfeatures = 3000) %>%
+    ScaleData(verbose = FALSE) %>%
+    RunPCA(npcs = 50, verbose = FALSE) %>%
+    RunHarmony("IL01_uniqueID", plot_convergence = TRUE) %>%
+    RunUMAP(reduction = "harmony", dims = 1:8, min.dist=0.001, spread = 5,n.components = 2) %>% #1:5
+    FindNeighbors(reduction = "harmony", dims = 1:8) %>% #1:5
+    FindClusters(resolution = c(0.1, 0.2, 0.4, 0.6,0.8)) %>%
+    identity()
+
+OLIG_OPC.sub.rm12only <- OLIG_OPC.sub.rm12only  %>%
+    PercentageFeatureSet(pattern = "^mt-", col.name = "percent.mt") %>%
+    NormalizeData(normalization.method = "LogNormalize",verbose = FALSE,scale.factor = 10000) %>%
+    FindVariableFeatures(selection.method = "vst", nfeatures = 3000) %>%
+    ScaleData(verbose = FALSE) %>%
+    RunPCA(npcs = 50, verbose = FALSE) %>%
+    RunHarmony("IL01_uniqueID", plot_convergence = TRUE) %>%
+    RunUMAP(reduction = "harmony", dims = 1:8, min.dist=0.001, spread = 5,n.components = 2) %>% #1:5
+    FindNeighbors(reduction = "harmony", dims = 1:8) %>% #1:5
+    FindClusters(resolution = c(0.1, 0.2, 0.4, 0.6, 0.8)) %>%
+    identity()
+```
+
+```{r fig.height=12, fig.width=12}
+
+resolution = paste0('RNA_snn_res.',c(0.1, 0.2, 0.4,0.6))
+
+dimplot.all <- list()
+
+for(ii in resolution){
+dimplot.all[[ii]] <- DimPlot(OLIG_OPC.sub.rm12only,group.by = ii,label = T) + NoAxes() + NoLegend() + labs(title = ii)
+}
+
+p.name <- paste0('DimPlot.OLigOPC.rm12only')
+
+nCol <- ceiling(sqrt(length(resolution)))
+
+do.call("plot_grid", c(dimplot.all,ncol = nCol))
+              
+  ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/2_PDF/OLIG/',
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.PDF'),
+       limitsize = F)  
+  
+  do.call("plot_grid", c(dimplot.all,ncol = nCol))
+  
+  ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/1_PNG/OLIG/',
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.png'),
+       limitsize = F)  
+```
+
+```{r Transfer clustering labels from subset to merged object: res0.3}
+index <- match(colnames(OLIG_OPC.sub.rm12only),colnames(OLIG_OPC))
+
+#Is index the right size? yes 
+length(index) == length(colnames(OLIG_OPC.sub.rm12only)) #TRUE
+
+# Does the index reflect the position of each cell from the subset in the merged object? yes
+test <- colnames(OLIG_OPC)[index] == colnames(OLIG_OPC.sub.rm12only) 
+which(test == 'FALSE') #all true 
+
+#transfer labels
+OLIG_OPC$res0.2_12only_20240508 <- paste0("RM_res0.6_",OLIG_OPC$RNA_snn_res.0.6)
+OLIG_OPC$res0.2_12only_20240508[index] <-  as.character(OLIG_OPC.sub.rm12only$RNA_snn_res.0.2)
+
+#Was transfer successful? 
+
+  ## yes all counts match up
+table(OLIG_OPC$res0.2_12only_20240508) #Merged object
+table(OLIG_OPC.sub.rm12only$RNA_snn_res.0.2) #Labels that were transferred in the subset object
+
+  ## are the correct cells labeled?
+test <- OLIG_OPC.sub$res0.2_12only_20240508[index] == OLIG_OPC.sub.rm12only$RNA_snn_res.0.2 # are those cells given the same name in both objects?
+which(test == 'FALSE') #all true 
+
+# Convert back to a factor
+OLIG_OPC.sub$res0.2_12only_20240508 <- as.factor(OLIG_OPC.sub$res0.2_12only_20240508)
+
+
+#Repeat transfer for 0.4
+OLIG_OPC$res0.4_12only_20240508 <- '' %>% paste0("RM_res0.6_",OLIG_OPC$RNA_snn_res.0.6)
+OLIG_OPC$res0.4_12only_20240508[index] <-  as.character(OLIG_OPC.sub.rm12only$RNA_snn_res.0.4)
+
+
+OLIG_OPC.sub.rm12only$res0.6_OLIG_OPC <- OLIG_OPC$RNA_snn_res.0.6[index]
+
+
+
+# Convert back to a factor
+OLIG_OPC$res0.2_12only_20240508 <- as.factor(OLIG_OPC$res0.2_12only_20240508)
+OLIG_OPC$res0.4_12only_20240508 <- as.factor(OLIG_OPC$res0.4_12only_20240508)
+OLIG_OPC.sub.rm12only$res0.6_OLIG_OPC <- as.factor(OLIG_OPC.sub.rm12only$res0.6_OLIG_OPC)
+
+
+
+```
+
+
+```{r fig.height=4, fig.width=12}
+DimPlot(OLIG_OPC,group.by = 'RNA_snn_res.0.6',label = T, repel = T) + NoAxes()  + labs(title = 'RNA_snn_res.0.6') | DimPlot(OLIG_OPC.sub.rm12only,group.by = 'res0.6_OLIG_OPC',label = T) + NoAxes()  + labs(title = 'res0.6 from OLIG_OPC pre-sub')
+
+DimPlot(OLIG_OPC.sub.rm12only,group.by = 'RNA_snn_res.0.4',label = T) + NoAxes()  + labs(title = 'RNA_snn_res.0.4') | DimPlot(OLIG_OPC,group.by = 'res0.4_12only_20240508',label = T, repel = T) + NoAxes()  + labs(title = 'res0.4 from OLIG_OPC sub 12 only') 
+
+DimPlot(OLIG_OPC.sub.rm12only,group.by = 'RNA_snn_res.0.2',label = T) + NoAxes()  + labs(title = 'RNA_snn_res.0.2') | DimPlot(OLIG_OPC,group.by = 'res0.2_12only_20240508',label = T, repel = T) + NoAxes()  + labs(title = 'res0.2 from OLIG_OPC sub 12 only') 
+```
+
+```{r fig.height=15, fig.width=15}
+FeaturePlot(OLIG_OPC.sub.rm12only,features =basic.marker1, order= TRUE)
+FeaturePlot(OLIG_OPC.sub.rm12only,features =basic.marker1, order= FALSE)
+```
+
+```{r fig.height=12, fig.width=12}
+
+resolution = paste0('RNA_snn_res.',c(0.1, 0.2, 0.4, 0.6,0.8))
+
+dimplot.all <- list()
+
+for(ii in resolution){
+dimplot.all[[ii]] <- DimPlot(OPC,group.by = ii,label = T) + NoAxes() + NoLegend() + labs(title = ii)
+}
+
+p.name <- paste0('DimPlot.OPC')
+
+nCol <- ceiling(sqrt(length(resolution)))
+
+do.call("plot_grid", c(dimplot.all,ncol = nCol))
+              
+OneDrive_PDF.PNG(p.name)
+```
+
+
+```{r fig.height=10, fig.width=10}
+clustree(OPC,prefix = "RNA_snn_res." )
+```
+
+```{r fig.height=7, fig.width=12}
+resolution <- 'RNA_snn_res.0.6'
+
+count <- VlnPlot(OPC,feature = "nCount_RNA",group.by = resolution,pt.size =0,ncol = 1,cols = colorsp.new(length(levels(OLIG_OPC@meta.data[[resolution]])))) + theme(text = element_text(size = 12)) + stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,geom = "crossbar", width = 0.5) #+ ylim(c(0 ,30000))
+mt <- VlnPlot(OLIG_OPC,feature = "percent.mt",group.by = resolution,pt.size =0,ncol = 1,cols = colorsp.new(length(levels(OLIG_OPC@meta.data[[resolution]])))) + theme(text = element_text(size = 12)) + stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,geom = "crossbar", width = 0.5) #+ ylim(c(0 ,5))
+feat <- VlnPlot(OLIG_OPC,feature = "nFeature_RNA",group.by = resolution,pt.size =0,ncol = 1,cols = colorsp.new(length(levels(OLIG_OPC@meta.data[[resolution]])))) + theme(text = element_text(size = 12)) + stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,geom = "crossbar", width = 0.5) #+ ylim(c(0 ,3000))
+
+(count / mt / feat) & NoLegend() | DimPlot(object = OLIG_OPC, reduction = "umap", pt.size = .05, group.by = resolution ,label = TRUE,label.size = 5,cols =colorsp.new(length(levels(OLIG_OPC@meta.data[[resolution]]))))  + labs(title = "After Harmony")+ theme_void() + NoLegend()
+
+```
+
+```{r fig.height=15, fig.width=15}
+resolution <- 'RNA_snn_res.0.8'
+DimPlot(OPC, split.by = 'IL08_condition.8',group.by = resolution,label = T, ncol =4) + NoAxes() + NoLegend() + labs(title = resolution)
+```
+
+
+
+```{r echo=TRUE, fig.height=5, fig.width=10}
+
+OPC.sub <- subset(OPC, subset = RNA_snn_res.0.8 %in% c(10,12,13),invert = TRUE)
+
+resolution <- "RNA_snn_res.0.8"
+data <- OPC.sub@meta.data %>% dplyr::select(RNA_snn_res.0.8,IL08_condition.7) %>% group_by(IL08_condition.7)  %>% #IL08_condition.2, IL06_tissue.1,IL08_condition
+  table() %>% 
+  as.data.frame() 
+
+
+ data.list <- split(data,data$IL08_condition.7)
+ 
+total <- ''
+for(i in 1:length(data.list)){
+  total[i] <- sum(data.list[[i]]$Freq)
+}
+
+data <- data %>%
+  mutate(totals = as.numeric(rep(total,each =length(levels(as.factor(OPC@meta.data[[resolution]])))))) #%>%
+
+#data <- mutate(data, IL08_condition.8 = factor(IL08_condition.8,levels =c('T1_Onset_ctrl_WM', 'T1_Onset_DTA_WM', 'T2_Peak_ctrl_WM', 'T2_Peak_DTA_WM', 'T3_Recovery_ctrl_WM', 'T3_Recovery_DTA_WM', 'T4_LateOnset_ctrl_WM', 'T4_LateOnset_DTA_WM', 'T1_Onset_ctrl_GM', 'T1_Onset_DTA_GM', 'T2_Peak_ctrl_GM', 'T2_Peak_DTA_GM', 'T3_Recovery_ctrl_GM', 'T3_Recovery_DTA_GM', 'T4_LateOnset_ctrl_GM', 'T4_LateOnset_DTA_GM')))
+
+
+data <- mutate(data,Freq2 = data$Freq/data$totals) 
+data <- mutate(data,tissue = strsplit(as.character(data$IL08_condition.7), "_")) 
+data <- mutate(data, condition = unlist( lapply( X = data$tissue, FUN = "[[", FUN.VALUE = 3 ) ))
+data <- mutate(data, time = unlist( lapply( X = data$tissue, FUN = "[[", FUN.VALUE = 2 ) ))
+#data <- mutate(data, tissue = unlist( lapply( X = data$tissue, FUN = "[[", FUN.VALUE = 4 ) ))
+data <- mutate(data, time = factor(data$time,levels = c('Onset','Peak','Recovery','LateOnset')))
+
+
+########################################################################
+p.name <- 'RelProportion.by.condition.OPC.sub1.dim1:8'
+
+ggplot(data, aes(fill=RNA_snn_res.0.8, y=100*Freq2, x=IL08_condition.7)) + 
+geom_bar(position="stack", stat="identity",col = 'black')  + 
+  theme_calc() + 
+  theme(legend.background = element_rect(color = NA),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.border = element_blank(),
+        plot.background = element_blank(),
+        rect = element_blank())+
+        ylab('%') +
+                            #warmcool(length(levels(factor(OPC@meta.data[[resolution]]))))[c(2,3,9,10,11,1,5,6,8,7,4)]) + 
+                            #colorsp.new(length(levels(factor(OPC@meta.data[[resolution]])))+1)[c(10,3,2,11,12,4,5,6,7,8,9)])+
+                          #  warmcool(length(levels(factor(OPC@meta.data[[resolution]]))))) +  # #
+  facet_wrap(~time,drop=TRUE,scales = 'free',ncol = 4) 
+
+ggsave(filename = paste0('/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/figures/06_L2Analysis/06.a_OLIG/',
+                         p.name,'_',
+                         'X.', quo_name(last_plot()[["mapping"]][["x"]]),"_",
+                         'Y.',quo_name(last_plot()[["mapping"]][["y"]]),"_",
+                         'FILL.', quo_name(last_plot()[["mapping"]][["fill"]]), "_",
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.PDF'), 
+       limitsize = F) 
+
+ggsave(filename = paste0('/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/figures/06_L2Analysis/06.a_OLIG/',
+                         p.name,'_',
+                         'X.', quo_name(last_plot()[["mapping"]][["x"]]),"_",
+                         'Y.',quo_name(last_plot()[["mapping"]][["y"]]),"_",
+                         'FILL.', quo_name(last_plot()[["mapping"]][["fill"]]), "_",
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.png'), height = 5, width = 10) 
+```
+```{r}
+DimPlot(OPC,group.by = 'IL15_annotation',label = T) + NoAxes() + NoLegend() + labs(title = ii)
+
+DimPlot(OLIG_OPC.sub,group.by = 'IL15_annotation',label = T) + NoAxes() + NoLegend() + labs(title = ii)
+
+DimPlot(OLIG_OPC.sub,group.by = 'RNA_snn_res.0.4',label = T) + NoAxes() + NoLegend() 
+
+```
+
+```{r fig.height=8, fig.width=8}
+resolution <- 'RNA_snn_res.0.8'
+DimPlot(OPC.sub2, split.by = 'IL08_condition.8',group.by = resolution,label = T, ncol =4) + NoAxes() + NoLegend() + labs(title = resolution)
+```
+
+```{r fig.height=12, fig.width=14}
+FeaturePlot(OPC, c(basic.marker1,'Plp1','Mog'), ncol = 6) & NoAxes() & NoLegend()
+FeaturePlot(OPC.sub, basic.marker1, ncol = 6) & NoAxes() & NoLegend()
+FeaturePlot(OLIG_OPC.sub, basic.marker1, ncol = 6) & NoAxes() & NoLegend()
+```
+
+```{r fig.height=7, fig.width=12}
+resolution <- 'RNA_snn_res.0.8'
+
+count <- VlnPlot(OPC.sub,feature = "nCount_RNA",group.by = resolution,pt.size =0,ncol = 1,cols = colorsp.new(length(levels(OLIG_OPC@meta.data[[resolution]])))) + theme(text = element_text(size = 12)) + stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,geom = "crossbar", width = 0.5) #+ ylim(c(0 ,30000))
+mt <- VlnPlot(OPC.sub,feature = "percent.mt",group.by = resolution,pt.size =0,ncol = 1,cols = colorsp.new(length(levels(OLIG_OPC@meta.data[[resolution]])))) + theme(text = element_text(size = 12)) + stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,geom = "crossbar", width = 0.5) #+ ylim(c(0 ,5))
+feat <- VlnPlot(OPC.sub,feature = "nFeature_RNA",group.by = resolution,pt.size =0,ncol = 1,cols = colorsp.new(length(levels(OLIG_OPC@meta.data[[resolution]])))) + theme(text = element_text(size = 12)) + stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,geom = "crossbar", width = 0.5) #+ ylim(c(0 ,3000))
+
+(count / mt / feat) & NoLegend() | DimPlot(object = OPC.sub, reduction = "umap", pt.size = .05, group.by = resolution ,label = TRUE,label.size = 5,cols =colorsp.new(length(levels(OPC.sub@meta.data[[resolution]]))))  + labs(title = "After Harmony")+ theme_void() + NoLegend()
+
+```
+
+
+```{r}
+OLIG_OPC.sub$IL15_annotation.new <- 'OLIG'
+OLIG_OPC.sub$IL15_annotation.new[which(OLIG_OPC.sub$RNA_snn_res.0.4 %in% c(5,11))] <-  'OPC'
+
+
+OLIG_OPC.sub$IL15_annotation.OPC <- OLIG_OPC.sub$IL15_annotation.new
+
+cellname <- colnames(OPC.sub)[which(OPC.sub$RNA_snn_res.0.8 %in% c(10))]
+index <- which(colnames(OLIG_OPC.sub) %in% cellname)
+  
+OLIG_OPC.sub$IL15_annotation.OPC[index] <- 'OPC_Res0.8_c10'
+
+
+cellname <- colnames(OPC.sub)[which(OPC.sub$RNA_snn_res.0.8 %in% c(9))]
+index <- which(colnames(OLIG_OPC.sub) %in% cellname)
+  
+OLIG_OPC.sub$IL15_annotation.OPC[index] <- 'OPC_Res0.8_c09'
+
+DimPlot(OLIG_OPC.sub,group.by  = 'IL15_annotation.OPC')
+```
+
+
+
+```{r fig.height=6, fig.width=12}
+
+OPC.sub2 <- subset(OPC.sub,subset = RNA_snn_res.0.8 %in% c(10),invert = TRUE)
+OPC.sub2$IL15_annotation.pre <- OPC.sub2$RNA_snn_res.0.8
+
+new.order <- names(table(OPC.sub2$RNA_snn_res.0.8))
+OPC.sub2$RNA_snn_res.0.8 <-factor(OPC.sub2$RNA_snn_res.0.8,levels = new.order[c(1,2,3,4,10,12)])
+
+DimPlot(OPC.sub2,group.by = 'RNA_snn_res.0.8',label = T) + NoAxes() + NoLegend() + labs(title = ii)
+FeaturePlot(OLIG_OPC.sub,c('Neu4','Enpp6','Tns3','Top2a','Ifit3'),ncol = 2) | FeaturePlot(OPC,c('Neu4','Enpp6','Tns3','Top2a','Ifit3'),ncol = 2)
+FeaturePlot(OPC.sub2,'Top2a')
+
+DimPlot(OPC.sub2)
+
+Idents(OPC.sub2) <- OPC.sub2$RNA_snn_res.0.8
+DimPlot(OPC.sub2)
+
+cluster9v11.marker <- FindMarkers(OPC.sub2, ident.1 = '9',ident.2 = '11') 
+cluster9.marker.filter <- filter(cluster9.marker,pct.2 < 0.1)
+
+# cluster10.marker <- FindMarkers(OLIG_OPC.sub, ident.1 = 'OPC_Res0.8_c10',ident.2 = 'OLIG') 
+# cluster10.marker.filter <- filter(cluster10.marker,pct.2 < 0.2)
+# 
+cluster9.marker <- FindMarkers(OLIG_OPC.sub, ident.1 = 'OPC_Res0.8_c09',ident.2 = 'OLIG')
+cluster9.marker.filter <- filter(cluster9.marker,pct.2 < 0.2)
+
+cluster9Velse.marker <- FindMarkers(OPC.sub2, ident.1 = '9',ident.2 = c(0,1,2,3))
+#cluster9Velse.marker.filter <- filter(cluster9.marker,pct.2 < 0.2)
+
+Idents(OPC.sub2) <- OPC.sub2$RNA_snn_res.0.6
+DimPlot(OPC.sub2)
+
+
+
+OLIG_OPC.sub$RNA_snn_res.0.8 <- factor(OLIG_OPC.sub$RNA_snn_res.0.8, levels = c(12,9,16,13,14,15,8,11,0,1,3,6,5,2,10,4,7))
+
+genes <-  filter(cluster9Velse.marker,pct.2 < 1)
+
+
+
+```
+
+```{r fig.height=4, fig.width=12}
+  DotPlot(OLIG_OPC.sub.rm12only,features='Tmem97',group.by = 'RNA_snn_res.0.4', dot.scale = 6,cluster.idents = F,col.max = 1.5, col.min = -1.5)+
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+  scale_colour_gradient2(low = "#046A83", mid = "white",high = '#D26952',midpoint = 0) + theme_light()  + 
+  rotate_x_text(60) +
+    theme( plot.margin = margin(b = 0, r = 20),
+          legend.position = 'right',
+          axis.title.x = element_text(size = 0),
+          axis.title.y = element_text(size = 0)) +
+    geom_point(aes(size = pct.exp), alpha = 0.25, shape = 21, color="black", stroke = 0.75)+
+  FontSize(x.text = 12,y.text = 12) + coord_flip() 
+
+#function to plot markers for each cluster 
+
+FeaturePlot(OLIG_OPC.sub.rm12only,features ="Tmem97", order= FALSE, split.by = "IL08_condition.6", pt.size = 0.05)
+
+```
+
+
+```{r}
+saveRDS(OLIG.sub, '/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/data/rda/06_L2.Analysis/L2.all/06_OLIG/OLIG_all_cleaned_20220304.RDS')
+saveRDS(OPC.sub2, '/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/data/rda/06_L2.Analysis/L2.all/06_OPC/OPC_all_cleaned_20220304.RDS')
+
+saveRDS(OLIG_OPC.sub.rm12only, '/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/data/rda/06_L2.Analysis/L2.all/06_OPC/OPC_T2T3_cleaned_20240614.RDS')
+```

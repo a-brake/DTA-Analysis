@@ -1,0 +1,449 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r message = FALSE, error = FALSE, warning = FALSE,results= 'hide'}
+library(dplyr)
+library(clustree)
+library(Seurat)
+library(patchwork)
+library(plyr)
+library(magrittr)
+library(tidyr)
+library(ggplot2)
+library(ggthemes)
+library(fs)
+library(roxygen2)
+library(utils)
+library(fs)
+library(knitr)
+library(purrr)
+library(reshape)
+library(ggplot2)
+library(matlab)
+library(matrixStats)
+library(cowplot)
+library(openxlsx)
+library(readxl)
+library(harmony)
+library(SoupX)
+library(DoubletFinder)
+library(ggpubr)
+library(pheatmap)
+library(dittoSeq)
+library(scales)
+library(gridExtra)
+library(stargazer)
+library(data.table)
+library(rmarkdown)
+library(monocle3)
+library(monocle)
+library(SeuratWrappers)
+library(monocle3)
+library(monocle)
+library(pheatmap)
+library(gprofiler2)
+library(stringr)
+library(RColorBrewer)
+library(moonBook)
+library(ggforce)
+library(yarrr)
+library(clustree)
+
+ basic.marker1 <- c( "Lepr", "Cemip", "Mag", "Pdgfra", "Gfap", "Slc1a2", "Ptprc", "Syt1", "Nrg1", "ç", "Cux2", 'S100a8','Gad1', 'Slc17a7', 'Flt1', "Mbp", 'Plp1','Tmem119', 'P2ry12', 'Trem2', 'Itgam', 'Itgax', 'Mecom', 'Pdgfrb', 'Acta2', 'Apoe', 'Top2a', 'Enpp6', 'Cspg4','Cd14')
+
+colorsp.new <- colorRampPalette(paste0('#',c("f7b99b","e88da0","73c9e8","b1d29d","f9d28b","72b6e4")))
+ 
+ color.match <- colorRampPalette(paste0('#',c("f7bba1","e99ca4","b2aec6","8fccd6","b5d5a3","e7d597"))) ## Use this for L1 object
+ 
+ color.test <- colorRampPalette(paste0('#',c("E6735A","3d5467","779fa1","FCDE9C","564154","af5d63"))) ## Use this for MIC object
+ 
+ `%notin%` <- Negate(`%in%`)
+ 
+ draw_colnames_45 <- function (coln, gaps, ...) {
+    coord <- pheatmap:::find_coordinates(length(coln), gaps)
+    x     <- coord$coord - 0.5 * coord$size
+    res   <- grid::textGrob(
+      coln, x = x, y = unit(1, "npc") - unit(3,"bigpts"),
+      vjust = 0.75, hjust = 1, rot = 45, gp = grid::gpar(...)
+    )
+    return(res)
+}
+assignInNamespace(
+  x = "draw_colnames",
+  value = "draw_colnames_45",
+  ns = asNamespace("pheatmap")
+)
+
+OneDrive_PDF.PNG <- function(p.name){
+  ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/2_PDF/OLIG/',
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.PDF'),
+       limitsize = F)  
+
+  
+  ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/1_PNG/OLIG/',
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.png'),
+       limitsize = F)  
+}
+
+`%notin%` <- Negate(`%in%`)
+
+```
+
+# Functions for dotplots and feature plots split by a category with titles
+```{r}
+
+FPlist <- function(seuratobj,genes){
+    FeaturePlot(seuratobj, genes ,ncol = n.col,cols = c('grey90',paste0('#',c("4FB3AA","e9d8a6","ee9b00","ae2012"))),pt.size = 0.05, order = order.input) & NoAxes() 
+} #function to plot markers for each cluster 
+
+
+DPlist <- function(seuratobj,genes,resolution){
+   DotPlot(seuratobj,features=genes,group.by = resolution, dot.scale = 6,cluster.idents = F,col.max = 1.5, col.min = -1.5)+
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+  scale_colour_gradient2(low = "#046A83", mid = "white",high = '#D26952',midpoint = 0) + theme_light()  + 
+  rotate_x_text(60) +
+    theme( plot.margin = margin(b = 0, r = 20),
+          legend.position = 'right',
+          axis.title.x = element_text(size = 0),
+          axis.title.y = element_text(size = 0)) +
+    geom_point(aes(size = pct.exp), alpha = 0.25, shape = 21, color="black", stroke = 0.75)+
+  FontSize(x.text = 12,y.text = 12) + coord_flip()
+} #function to plot markers for each cluster 
+```
+
+# Function to remove duplicated gene names from a list of markers from findmarkers 
+```{r}
+rmDup <- function(list.of.genes){
+ df <- bind_rows(list.of.genes, .id = 'Cluster') #convert list to a df, list name elements go to Cluster column
+ df$Cluster <- as.factor(df$Cluster) # make factor for reassigning names after split
+df$gene <- gsub(pattern = "\\.\\.\\.(.+)", x = rownames(df), replacement = '') #remove text after gene name for duplicated marker, store in new col called gene
+df <- df[which(isUnique(df$gene) == T),] # subset the df for only unique genes
+list <- split(df,df$Cluster ) # split back into a list by the Cluster col
+names(list) <- levels(df$Cluster) #reassign names using Cluster levels
+
+list.genes <- lapply(list, rownames) # make list with just gene names 
+
+list.out <- list(list,list.genes)
+names(list.out) <- c('List','List.genes') # Output is a list of two different lists: (1) List with original formatting containing expression info and (2) List with only gene names split by cluster
+
+list.out
+}
+```
+# Function to remove duplicated gene names from a list from findmarkers, prepare a paged table display, and save it as a csv 
+```{r}
+markers.to.exp <- function(list.of.markers.to.export,file.name){
+  list.of.markers.to.export_rownames <- lapply(list.of.markers.to.export, rownames)
+
+list.of.markers.to.export <- bind_rows(list.of.markers.to.export, .id = 'Cluster') %>% #merge list of markers into one dataframe, new column for cluster number
+  setorder(-avg_logFC) #sort by average log FC
+paged_table(list.of.markers.to.export) # display table
+
+list.of.markers.to.export$gene <- gsub(pattern = "\\.\\.\\.(.+)", x = rownames(list.of.markers.to.export), replacement = '') #remove text after gene name for duplicated marker
+
+if (exists(file.name) == T){
+write.table(markers.toexport, 
+            paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_', file.name,'_',
+            format(Sys.Date(), "%Y%m%d"),
+            '.csv'),
+            append= F, 
+            sep=',',
+            row.names = TRUE,
+            col.names = NA)
+} else{'No filename given, did not save csv'}
+
+list.of.markers.to.export
+}
+```
+# QC plot function
+```{r fig.height=7, fig.width=12}
+
+QCplot <- function(seuratobj,resolution){
+  colorsp.new <- colorRampPalette(paste0('#',c("f7b99b","e88da0","73c9e8","b1d29d","f9d28b","72b6e4")))
+  
+  count <- VlnPlot(seuratobj,feature = "nCount_RNA",group.by = resolution,pt.size =0,ncol = 1,cols = colorsp.new(length(levels(seuratobj@meta.data[[resolution]])))) + theme(text = element_text(size = 12)) + stat_summary(fun = median, fun.min = median, fun.max = median,geom = "crossbar", width = 0.5) #+ ylim(c(0 ,30000))
+mt <- VlnPlot(seuratobj,feature = "percent.mt",group.by = resolution,pt.size =0,ncol = 1,cols = colorsp.new(length(levels(seuratobj@meta.data[[resolution]])))) + theme(text = element_text(size = 12)) + stat_summary(fun = median, fun.min = median, fun.max = median,geom = "crossbar", width = 0.5) + ylim(c(0 ,15))
+feat <- VlnPlot(seuratobj,feature = "nFeature_RNA",group.by = resolution,pt.size =0,ncol = 1,cols = colorsp.new(length(levels(seuratobj@meta.data[[resolution]])))) + theme(text = element_text(size = 12)) + stat_summary(fun = median, fun.min = median, fun.max = median,geom = "crossbar", width = 0.5) #+ ylim(c(0 ,3000))
+
+(count / mt / feat) & NoLegend() | DimPlot(object = seuratobj,reduction = "umap", pt.size = .25, group.by = resolution ,label = TRUE,label.size = 5,cols =colorsp.new(length(levels(seuratobj@meta.data[[resolution]]))))  + labs(title = paste0(resolution))+ theme_void() + NoLegend()
+}
+
+
+```
+
+
+```{r}
+readRDS('')
+```
+
+
+# Gene module analysis
+```{r set-up CDS}
+# CDS <- as.cell_data_set(IMM_T2T3) %>%
+#   estimate_size_factors()
+# 
+# ## Add gene names into CDS
+# CDS@rowRanges@elementMetadata@listData[["gene_short_name"]] <- rownames(IMM_T2T3[["RNA"]])
+# 
+# 
+# CDS <- cluster_cells(CDS,reduction_method = "UMAP")
+# CDS <- learn_graph(CDS, use_partition = TRUE)
+# 
+# saveRDS(CDS,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_GeneModule_knn_CDS_',
+#            format(Sys.Date(), "%Y%m%d"),
+#            '.rda'))
+
+CDS <- readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_GeneModule_knn_CDS_20240517.rda')
+```
+
+# There are two approaches for differential analysis in Monocle: regression analysis (fit_models) and graoh autocorrelation (graph_test)
+  ## Regression analysis: using *fit_models()*, you can evaluate whether each gene depends on variables such as time, treatments, etc.
+    ### IL08_condition.7
+```{r fit_models}
+# gene_fits <- fit_models(CDS, model_formula_str = "~IL08_condition.7")
+# 
+# # saveRDS(gene_fits,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_GeneFits_IL08condition7_',
+# #            format(Sys.Date(), "%Y%m%d"),
+# #            '.csv'))
+# saveRDS(gene_fits,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_GeneFits_IL08condition7_',
+#            format(Sys.Date(), "%Y%m%d"),
+#            '.rds'))
+
+########################################## Read saved object ########################################## 
+gene_fits <- readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_GeneFits_IL08condition7_20240517.rds')
+
+
+
+fit_coefs <- coefficient_table(gene_fits)
+DTA_terms <- fit_coefs
+DTA_terms<- filter(DTA_terms,q_value < 0.01) %>%
+        select(gene_short_name, term, q_value, estimate,model,num_cells_expressed)
+
+# eval.fit <- monocle3::evaluate_fits(DTA_terms)
+# 
+# # saveRDS(eval.fit,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_GeneFits_evaluate_fits_IL08condition7_',
+# #            format(Sys.Date(), "%Y%m%d"),
+# #            '.csv'))
+# saveRDS(eval.fit,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_GeneFits_evaluate_fits_IL08condition7_',
+#            format(Sys.Date(), "%Y%m%d"),
+#            '.rds'))
+
+########################################## Read saved object ########################################## 
+eval_fits <- readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_GeneFits_evaluate_fits_IL08condition7_20240517.rds')
+```
+```{r filter marker genes from fit_models and plot fig.height=25, fig.width=5}
+table((DTA_terms['term']))
+
+DTA_terms.sub <- DTA_terms %>% filter(term != "(Intercept)") %>% filter(abs(estimate)>1) %>% filter(num_cells_expressed > 1500)
+
+CDS_sub <- CDS[rowData(CDS)$gene_short_name %in% head(unique(DTA_terms.sub$gene_short_name),200)]
+
+monocle3::plot_genes_by_group(CDS_sub,markers = head(unique(DTA_terms.sub$gene_short_name),200), group_cells_by="IL08_condition.7") +
+      theme(axis.text.x=element_text(angle=45, hjust=1))
+
+
+```
+##Graph-autocorrelation analysis: using *graph_test()*, you can find genes that vary over a trajectory or between clusters.
+     - The function graph_test() uses a statistic from spatial autocorrelation analysis called Moran's I, which Cao & Spielmann et al showed to be effective in finding genes that vary in single-cell RNA-seq datasets.
+     - The data frame pr_graph_test_res has the Moran's I test results for each gene in the cell_data_set. If you'd like to rank the genes by effect size, sort this table by the morans_Icolumn, which ranges from -1 to +1. A value of 0 indicates no effect, while +1 indicates perfect positive autocorrelation and suggests that nearby cells have very similar values of a gene's expression. Significant values much less than zero are generally rare.
+     - Positive values indicate a gene is expressed in a focal region of the UMAP space (e.g. specific to one or more clusters). But how do we associate genes with clusters? The next section explains how to collect genes into modules that have similar patterns of expression and associate them with clusters.
+     
+*Principal graph method:* How do we find the genes that are differentially expressed on the different paths through the trajectory? How do we find the ones that are restricted to the beginning of the trajectory? Or excluded from it?
+Once again, we turn to graph_test(), this time passing it neighbor_graph="principal_graph", which tells it to test whether cells at similar positions on the trajectory have correlated expression:
+
+```{r GeneModule-longstep_GraphTest fig.height=6 fig.width=3}
+
+`%notin%` <- Negate(`%in%`)
+
+########################################## Read saved object ########################################## 
+# pr_deg_ids_KNN <- readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_GeneModule_knn_pr_graph_test_res_20240517.rds')
+# pr_deg_ids_PR <- readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_GeneFits_evaluate_fits_IL08condition7_20240517.rds')
+
+#knn method  
+# pr_graph_test_res_KNN <- graph_test(CDS, neighbor_graph="knn", cores=6) ##long step
+# pr_deg_ids_KNN <- row.names(subset(pr_graph_test_res_KNN, q_value < 0.05))
+
+# saveRDS(pr_graph_test_res_KNN,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_GeneModule_knn_pr_graph_test_res_',
+#            format(Sys.Date(), "%Y%m%d"),
+#            '.csv'))
+saveRDS(pr_graph_test_res_KNN,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_GeneModule_knn_pr_graph_test_res_',
+           format(Sys.Date(), "%Y%m%d"),
+           '.rds'))
+
+
+#principal graph method
+pr_graph_test_res_PR <- graph_test(CDS, neighbor_graph="principal_graph", cores=6) ##long step
+pr_deg_ids_PR <- row.names(subset(pr_graph_test_res_PR, q_value < 0.05))
+
+# saveRDS(pr_graph_test_res_PR,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_GeneModule_PrincipalGraph_pr_graph_test_res_',
+#            format(Sys.Date(), "%Y%m%d"),
+#            '.csv'))
+saveRDS(pr_graph_test_res_PR,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_GeneModule_PrincipalGraph_pr_graph_test_res_',
+           format(Sys.Date(), "%Y%m%d"),
+           '.rds'))
+
+```
+
+# Module Heatmaps
+```{r Gene Module heatmaps grouped by clustering and condition fig.height=2, fig.width=4}
+## Heatmap by RNA_snn_res.0.3
+cell_group_df <- tibble::tibble(cell=row.names(colData(CDS)), 
+                                cell_group=CDS@colData@listData[["RNA_snn_res.0.3"]])
+
+agg_mat <- aggregate_gene_expression(CDS, gene_module_df.sub , cell_group_df)
+row.names(agg_mat) <- stringr::str_c("Module ", row.names(agg_mat))
+
+
+pheatmap::pheatmap(agg_mat, cluster_rows=TRUE, cluster_cols=FALSE,
+                   scale="column", clustering_method="ward.D2",
+                   fontsize=12) + theme(axis.text.x = element_text(angle = 30, hjust = 1),plot.margin = margin(20,20,20))
+
+## Heatmap by IL08_condition.6
+cell_group_df <- tibble::tibble(cell=row.names(colData(cds_choose)), 
+                                cell_group=cds_choose@colData@listData[["IL08_condition.7"]])
+
+agg_mat <- aggregate_gene_expression(cds_choose, gene_module_df.sub , cell_group_df)
+row.names(agg_mat) <- stringr::str_c("Module ", row.names(agg_mat))
+
+
+pheatmap::pheatmap(agg_mat, cluster_rows=TRUE, cluster_cols=FALSE,
+                   scale="column", clustering_method="ward.D2",
+                   fontsize=12) + theme(axis.text.x = element_text(angle = 30, hjust = 1),plot.margin = margin(20,20,20))
+
+```
+
+```{r gene module analysis for selected regions}
+# cds_choose <- choose_cells(CDS)
+# subset_pr_test_res.sub <- graph_test(cds_choose, neighbor_graph="principal_graph", cores=4)
+# pr_deg_ids.sub <- row.names(subset(subset_pr_test_res.sub, q_value < 0.05))
+# gene_module_df.sub <- find_gene_modules(cds_choose[pr_deg_ids.sub,], resolution=0.001)
+# 
+# agg_mat <- aggregate_gene_expression(cds_choose, gene_module_df.sub)
+# module_dendro <- hclust(dist(agg_mat))
+# gene_module_df.sub$module <- factor(gene_module_df.sub$module, 
+#                                 levels = row.names(agg_mat)[module_dendro$order])
+```
+
+```{r Make plots for each module terms and plotcells fig.height=15, fig.width=6}
+FF <- 0
+PT <- 0.05
+
+IMM_T2T3.sub <- subset(IMM_T2T3,cells = colnames(cds_choose))
+IMM_T2T3.sub <- AddModuleScore(IMM_T2T3.sub,features = list(gene_module_df.sub$id))
+
+gene_module_df.list <- split(gene_module_df.sub, f = gene_module_df.sub$module) 
+
+feature.plot <- list()
+heatmap <- list()
+cells <- list()
+terms <- list()
+termplot <- list()
+
+for (L in 1:length(gene_module_df.list)){ #c(3,5,10,14,21)){ #1:length(gene_module_df.list)
+  tryCatch({
+    
+for.go <- gene_module_df.list[[L]] 
+for.go.clean <- str_replace(for.go$id, "mt-", "*")
+
+    
+gost.out <- gost(for.go.clean, organism = "mmusculus", ordered_query = F, multi_query = FALSE, significant = T, exclude_iea = F, measure_underrepresentation = FALSE, evcodes = T, user_threshold = PT, correction_method = "g_SCS", domain_scope = c("annotated"), custom_bg = NULL, numeric_ns = "", sources = NULL)
+      
+
+tt.temp <- gost.out[["result"]]
+tt.temp <- dplyr::filter(tt.temp, source %in% c('GO:MF','GO:CC','GO:BP')) #,'HP','REAC')) #keep these sources
+
+to.exclude <- intersect(tt.temp$term_id, unlist(tt.temp$parents))
+length(to.exclude)
+
+tt <- tt.temp[which(tt.temp$term_id %notin% to.exclude), ]
+tt <- tt[which(sapply(tt$parents, length) > FF), ]
+
+
+tt$fold.enrich <- (tt$intersection_size/tt$query_size)/(tt$term_size/tt$effective_domain_size)
+tt2 <- tt[, c("fold.enrich", "term_name", "source", "p_value")]
+tt2$term_name = with(tt2, reorder(term_name, -p_value))
+
+terms[[L]] <- as.character(tt.temp$term_name)
+
+  p.name <- paste0('Module.Features.mod',L,
+                   'bigtext')
+
+
+termplot[[L]] <- ggplot(tt2, aes(x = p_value, y = term_name)) +
+  geom_point(aes(color = source, size = fold.enrich), alpha = 0.5) +
+  scale_color_manual(values = c(colorsp(10))) +
+  scale_size(range = c(1, 10)) + scale_y_discrete(position = "right") + ggtitle(paste0("Knn.m",L)) + theme_minimal() + theme(axis.text.y = element_text(size =8),axis.text.x =element_text(size =10) ) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + theme(legend.position="bottom", legend.box = "vertical") + ylab('') + theme(legend.text=element_text(size=8)) + xlim(c(0,0.05))+ theme(plot.margin = unit(c(0, .5, .5, 1.5), "in")) + guides(size = guide_legend(order = 1),col = guide_legend(order = 2)) + theme(
+    legend.position = c(.97, .97),
+    legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    legend.background = element_rect(fill="white", color = 'grey90',size=.5)
+    )
+
+
+p.name <- paste0('IMM_Cell.Plot.mod',L)
+
+cells[[L]] <-  plot_cells(cds_choose, 
+           genes=gene_module_df.sub %>% filter(module %in% c(L)),
+           group_cells_by="cluster",
+                      label_cell_groups = FALSE,
+           label_groups_by_cluster = FALSE,
+           cell_size = .3,
+           show_trajectory_graph=FALSE)+ NoAxes()  + 
+  scale_colour_gradientn(colors = c("grey90",  "navy",'cyan4','chartreuse')) 
+
+plot_cells(cds_choose, 
+           genes=gene_module_df.sub %>% filter(module %in% 1),
+           group_cells_by="cluster",
+                      label_cell_groups = FALSE,
+           label_groups_by_cluster = FALSE,
+           cell_size = .5,
+           show_trajectory_graph=FALSE)+ NoAxes() + 
+  scale_colour_gradientn(colors = c("grey90",  "navy",'cyan4','chartreuse')) 
+######
+
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+do.call("plot_grid", c(cells,ncol = 2))
+```
+# Plot terms
+```{r fig.height=45, fig.width=30}
+do.call("plot_grid", c(termplot,ncol = 3))
+termplot[[1]]
+```
+# Plot genes
+```{r Features to Plot, fig.height=8, fig.width=5}
+resolution <- 'RNA_snn_res.0.3'
+markers <- unique(gene_module_df.sub[which(gene_module_df.sub$module %in% 8),])
+markers <- markers$id
+
+# markers <- c('Mt1','Mt2','Fxyd1','Dbi')
+ p <- DotPlot(IMM_T2T3,features=markers,group.by = resolution, dot.scale = 6,cluster.idents = T,col.max = 1.5, col.min = -1.5)
+ 
+ df <- p$data %>% filter(pct.exp > 25)
+```
+```{r Dot Plot, fig.height=8, fig.width=5}
+ DotPlot(IMM_T2T3,features=unique(df$features.plot),group.by = resolution, dot.scale = 6,cluster.idents = T)+
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+  scale_colour_gradient2(low = "#046A83", mid = "white",high = '#D26952',midpoint = 0) + theme_light()  + 
+  rotate_x_text(60) +
+    theme( plot.margin = margin(b = 0, r = 20),
+          legend.position = 'right',
+          axis.title.x = element_text(size = 0),
+          axis.title.y = element_text(size = 0)) +
+    geom_point(aes(size = pct.exp), alpha = 0.25, shape = 21, color="black", stroke = 0.75)+
+  FontSize(x.text = 12,y.text = 12) + coord_flip()
+
+```
+```{r fig.height=10, fig.width=10}
+FeaturePlot(IMM_T2T3, unique(as.character(df$features.plot)), order = T, ncol =2,cols = c('grey90',paste0('#',c("4FB3AA","e9d8a6","ee9b00","ae2012")))) 
+FeaturePlot(IMM_T2T3, unique(as.character(df$features.plot)), order = F, ncol = 2,cols = c('grey90',paste0('#',c("4FB3AA","e9d8a6","ee9b00","ae2012")))) 
+```
+
+
+

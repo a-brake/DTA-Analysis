@@ -1,0 +1,507 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r error=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(clustree)
+library(Seurat)
+library(patchwork)
+library(plyr)
+library(magrittr)
+library(tidyr)
+library(ggplot2)
+library(ggthemes)
+library(fs)
+library(roxygen2)
+library(utils)
+library(fs)
+library(knitr)
+library(purrr)
+library(reshape)
+library(ggplot2)
+library(matlab)
+library(matrixStats)
+library(cowplot)
+library(openxlsx)
+library(readxl)
+library(harmony)
+library(SoupX)
+#library(DoubletFinder)
+library(ggpubr)
+library(pheatmap)
+#library(dittoSeq)
+library(scales)
+library(gridExtra)
+library(stargazer)
+library(data.table)
+library(rmarkdown)
+library(monocle3)
+library(monocle)
+library(SeuratWrappers)
+library(monocle3)
+library(monocle)
+library(pheatmap)
+library(gprofiler2)
+library(stringr)
+library(RColorBrewer)
+library(moonBook)
+library(ggforce)
+library(yarrr)
+
+ basic.marker1 <- c( "Lepr", "Cemip", "Mag", "Pdgfra", "Gfap", "Slc1a2", "Ptprc", "Syt1", "Nrg1", "Tmem232", "Cux2", 'S100a8','Gad1', 'Slc17a7', 'Flt1', "Mbp", 'Tmem119', 'P2ry12', 'Trem2', 'Itgam', 'Itgax', 'Mecom', 'Pdgfrb', 'Acta2', 'Apoe', 'Top2a', 'Enpp6', 'Cspg4','Cd14')
+```
+
+# Function to save figures
+```{r}
+fig.path <- '/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/'
+
+fig.path.png <- '/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/1_PNG/AST'
+fig.path.png <- '/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/2_PDF/AST'
+
+save.fig <- function(fig.path,p.name) {
+ggsave(filename = paste0(fig.path.pdf, 
+                         p.name,'_',
+                         'GROUP.',resolution, "_",
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.PDF'), 
+       limitsize = F) 
+  
+  ggsave(filename = paste0(fig.path.png,
+                         p.name,'_',
+                         'GROUP.',resolution, "_",
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.png'), 
+       limitsize = F) 
+}
+  
+```
+
+# Functions for dotplots and feature plots split by a category with titles
+```{r}
+FPlist <- function(genes){
+    FeaturePlot(AST_T2T3, genes ,ncol = n.col,cols = c('grey90',paste0('#',c("4FB3AA","e9d8a6","ee9b00","ae2012"))),pt.size = 0.05, order = order.input) & NoAxes() 
+} #function to plot markers for each cluster 
+
+
+DPlist <- function(genes){
+   DotPlot(AST_T2T3,features=genes,group.by = 'IL15_annotation.short', dot.scale = 6,cluster.idents = F,col.max = 1.5, col.min = -1.5)+
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+  scale_colour_gradient2(low = "#046A83", mid = "white",high = '#D26952',midpoint = 0) + theme_light()  + 
+  rotate_x_text(60) +
+    theme( plot.margin = margin(b = 0, r = 20),
+          legend.position = 'right',
+          axis.title.x = element_text(size = 0),
+          axis.title.y = element_text(size = 0)) +
+    geom_point(aes(size = pct.exp), alpha = 0.25, shape = 21, color="black", stroke = 0.75)+
+  FontSize(x.text = 12,y.text = 12) + coord_flip()
+} #function to plot markers for each cluster 
+```
+
+# Read data file 
+```{r}
+AST_T2T3 <-readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/1_data.input/1_DTA/Cleaned_T2T3only/AST_T2T3_20240516.RDS')
+```
+
+# UPDATE INDEX LABELS
+```{r}
+index_labels <- read_excel('/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/data/index_labels_b1_b2_b3_b4.xlsx', sheet = 'IndexLabels')
+
+order <- match(AST_T2T3@meta.data$IL01_uniqueID, index_labels$IL01_uniqueID)
+AST_T2T3@meta.data$Test <- as.character(index_labels[order,]$Test)
+AST_T2T3@meta.data$IL02_species <- as.character(index_labels[order,]$IL02_species)
+AST_T2T3@meta.data$IL03_source.1 <- as.character(index_labels[order,]$IL03_source.1)
+AST_T2T3@meta.data$IL03_source.2 <- as.character(index_labels[order,]$IL03_source.2)
+AST_T2T3@meta.data$IL04_sex <- as.character(index_labels[order,]$IL04_sex)
+AST_T2T3@meta.data$IL05_ageDays <- as.character(index_labels[order,]$IL05_ageDays)
+AST_T2T3@meta.data$IL05_ageDays.1 <- as.character(index_labels[order,]$IL05_ageDays.1)
+AST_T2T3@meta.data$IL05_ageDays.2 <- as.character(index_labels[order,]$IL05_ageDays.2)
+AST_T2T3@meta.data$IL06_tissue.1 <- as.character(index_labels[order,]$IL06_tissue.1)
+AST_T2T3@meta.data$IL06_tissue.2 <- as.character(index_labels[order,]$IL06_tissue.2)
+AST_T2T3@meta.data$IL06_tissue.3 <- as.character(index_labels[order,]$IL06_tissue.3)
+AST_T2T3@meta.data$IL07_location <- as.character(index_labels[order,]$IL07_location)
+AST_T2T3@meta.data$IL08_condition <- as.character(index_labels[order,]$IL08_condition)
+AST_T2T3@meta.data$IL08_condition.1 <- as.character(index_labels[order,]$IL08_condition.1)
+AST_T2T3@meta.data$IL08_condition.2 <- as.character(index_labels[order,]$IL08_condition.2)
+AST_T2T3@meta.data$IL09_ilumina <- as.character(index_labels[order,]$IL09_ilumina)
+AST_T2T3@meta.data$IL10_chemistry <- as.character(index_labels[order,]$IL10_chemistry)
+AST_T2T3@meta.data$IL11_batch <- as.character(index_labels[order,]$IL11_batch)
+AST_T2T3@meta.data$IL12_LMinDays <- as.character(index_labels[order,]$IL12_LMinDays)
+AST_T2T3@meta.data$IL13_LmaxDays <- as.character(index_labels[order,]$IL13_LmaxDays)
+AST_T2T3@meta.data$IL14_dataset <- as.character(index_labels[order,]$IL14_dataset)
+AST_T2T3@meta.data$IL16_note <- as.character(index_labels[order,]$IL16_note)
+
+AST_T2T3$IL08_condition.5 <- ""
+AST_T2T3$IL08_condition.5 <- paste0(AST_T2T3$IL08_condition.2,"_",AST_T2T3$IL08_condition)
+
+AST_T2T3$IL08_condition.6 <- ''
+AST_T2T3$IL08_condition.6[which(AST_T2T3$IL08_condition %in% c('3w'))] <-  'T1_Onset'
+AST_T2T3$IL08_condition.6[which(AST_T2T3$IL08_condition %in% c('5w','~6.28w'))] <-  'T2_Peak'
+AST_T2T3$IL08_condition.6[which(AST_T2T3$IL08_condition %in% c('17w'))] <-  'T3_Recovery'
+AST_T2T3$IL08_condition.6[which(AST_T2T3$IL08_condition %in% c('~45w'))] <-  'T4_LateOnset'
+AST_T2T3$IL08_condition.6 <- factor(AST_T2T3$IL08_condition.6)
+
+
+
+AST_T2T3$IL08_condition.5 <- factor(AST_T2T3$IL08_condition.5, levels =c('ctrl_3w','DTA_3w','ctrl_5w', 'DTA_~6.28w','ctrl_17w', 'DTA_17w','ctrl_~45w','DTA_~45w'))
+
+AST_T2T3$IL08_condition.7 <- ""
+AST_T2T3$IL08_condition.7 <- paste0(AST_T2T3$IL08_condition.6,"_",AST_T2T3$IL08_condition.2)
+AST_T2T3$IL08_condition.7 <- factor(AST_T2T3$IL08_condition.7,levels =c('T1_Onset_ctrl','T2_Peak_ctrl','T3_Recovery_ctrl', 'T4_LateOnset_ctrl','T1_Onset_DTA','T2_Peak_DTA','T3_Recovery_DTA', 'T4_LateOnset_DTA'))
+
+AST_T2T3$IL08_condition.8 <- ""
+AST_T2T3$IL08_condition.8 <- paste0(AST_T2T3$IL08_condition.7,"_",AST_T2T3$IL06_tissue.1)
+AST_T2T3$IL08_condition.8 <- factor(AST_T2T3$IL08_condition.8,levels =c('T1_Onset_ctrl_GM','T2_Peak_ctrl_GM','T3_Recovery_ctrl_GM', 'T4_LateOnset_ctrl_GM','T1_Onset_DTA_GM','T2_Peak_DTA_GM','T3_Recovery_DTA_GM', 'T4_LateOnset_DTA_GM','T1_Onset_ctrl_WM','T2_Peak_ctrl_WM','T3_Recovery_ctrl_WM', 'T4_LateOnset_ctrl_WM','T1_Onset_DTA_WM','T2_Peak_DTA_WM','T3_Recovery_DTA_WM', 'T4_LateOnset_DTA_WM'))
+```
+
+# RNA_snn_res.0.3
+```{r fig.height=4, fig.width=5}
+DimPlot(AST_T2T3, group.by = 'RNA_snn_res.0.3', label = T, label.size = 5) + NoAxes()
+```
+
+# IL15_annotation.short
+## Assign annotations
+```{r}
+AST_T2T3$IL15_annotation.short <- ''
+
+AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))] <-  'Tel.GM'
+AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))] <-  'Tel.WM'
+AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))] <-  'NonTel.Hom.2'
+AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))] <-  'NonTel.Hom.1'
+AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))] <-  'NonTel.DTA.1'
+AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))] <-  'NonTel.DTA.2'
+AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))] <-  'NonTel.DTA.3'
+AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))] <-  'Tel.Cyc'
+
+AST_T2T3$IL15_annotation.short.1 <- ''
+
+AST_T2T3$IL15_annotation.short.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4,6,7) | AST_T2T3$RNA_snn_res.0.4 %in% c(11)) ] <-  'Tel'
+AST_T2T3$IL15_annotation.short.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1,0,5,2,3))] <-  'NonTel'
+
+AST_T2T3$IL15_annotation.short.2 <- ''
+
+AST_T2T3$IL15_annotation.short.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))] <-  'GM'
+AST_T2T3$IL15_annotation.short.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))] <-  'WM'
+AST_T2T3$IL15_annotation.short.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))] <-  'Hom.2'
+AST_T2T3$IL15_annotation.short.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))] <-  'Hom.1'
+AST_T2T3$IL15_annotation.short.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))] <-  'DTA.1'
+AST_T2T3$IL15_annotation.short.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))] <-  'DTA.2'
+AST_T2T3$IL15_annotation.short.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))] <-  'DTA.3'
+AST_T2T3$IL15_annotation.short.2[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))] <-  'Cyc'
+
+
+
+# reorder clusters 
+AST_T2T3$IL15_annotation.short <- as.character(AST_T2T3$IL15_annotation.short)
+order <- c(4,5,7,6,8,3,2,1)
+#order <- c(7,5,4,2,3,1,8,6)
+new.order <- names(table(AST_T2T3$IL15_annotation.short))
+AST_T2T3$IL15_annotation.short <- factor(AST_T2T3$IL15_annotation.short, levels = new.order[order])
+new.order <- names(table(AST_T2T3$IL15_annotation.short.1))
+AST_T2T3$IL15_annotation.short.1 <- factor(AST_T2T3$IL15_annotation.short.1, levels = new.order[order])
+new.order <- names(table(AST_T2T3$IL15_annotation.short.2))
+AST_T2T3$IL15_annotation.short.2 <- factor(AST_T2T3$IL15_annotation.short.2, levels = new.order[order])
+```
+
+## Dimplots showing new annotations
+```{r fig.height=4, fig.width=6}
+DimPlot(AST_T2T3, group.by = 'IL15_annotation.short', label = T, label.size = 5, repel = T) + NoAxes()
+DimPlot(AST_T2T3, group.by = 'IL15_annotation.short.1', label = T, label.size = 5, repel = T) + NoAxes()
+DimPlot(AST_T2T3, group.by = 'IL15_annotation.short.2', label = T, label.size = 5, repel = T) + NoAxes()
+
+table(AST_T2T3$IL15_annotation.short)
+```
+
+## Compare tissue sampling region to IL15_annotation.short
+```{r}
+library(dplyr)
+AST_T2T3@meta.data %>%
+  group_by(IL15_annotation.short, IL06_tissue.1, IL06_tissue.2, IL06_tissue.3) %>%
+  dplyr::summarize(count=n())
+
+write.csv(AST_T2T3@meta.data %>%
+  group_by(IL15_annotation.short, IL06_tissue.1, IL06_tissue.2, IL06_tissue.3) %>%
+  dplyr::summarize(count=n()),'/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/IL15_annotation.short_by_tissue.csv' )
+```
+
+## Compare tissue sampling region to IL15_annotation.short
+```{r}
+library(dplyr)
+AST_T2T3@meta.data %>%
+  group_by(IL15_annotation.short, IL08_condition.7) %>%
+  dplyr::summarize(count=n())
+
+write.csv(AST_T2T3@meta.data %>%
+  group_by(IL15_annotation.short, IL06_tissue.1, IL06_tissue.2, IL06_tissue.3) %>%
+  dplyr::summarize(count=n()),'/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/IL15_annotation.short_by_condition.csv' )
+```
+
+## Tel vs nonTel markers
+### Tel vs nonTel markers from http://mousebrain.org/taxonomy/r1_glia.html
+```{r}
+telVSnontel_genes <- list(c('Slc7a10','Mfsd2a','Agt','Fgfr3','Cldn10'),
+                          c('Agt','Apoc1','Slc6a11','Igsf1','Itih3','Ntsr2'),
+                          c('Ppp1r3g','Mfge8','Cldn10','S1pr1','Fjx1'),
+                          c('Fam107a','Mlc1','Gfap','Ntsr2','Hopx'))
+
+names(telVSnontel_genes) <- c("NonTel_protoplasmic","NonTel_fibrous","Tel_protoplasmic","Tel_fibrous")
+```
+### Dotplot of mousebrain.org genes
+```{r fig.height=9, fig.width=9}
+dp <- lapply(telVSnontel_genes, DPlist)
+
+rel.height <- as.numeric(lapply(telVSnontel_genes, length)) #take the expected number of rows and based on length of markers for each cluster and the number of columns
+
+p.name <- 'DotPlot_ASTT2T3_Tel_vs_NonTel' # to use for export
+ plot_grid(plotlist = dp, ncol = 2, rel_heights = rel.height, labels = paste0(names(dp)), label_colour = '#ae2012', vjust = 1.0, label_size = 16, scale = 0.85, axis = 'l') #merge plots for all clusters into one big figure for export
+```
+### Feature plot of mousebrain.org genes
+```{r fig.height=13, fig.width=15}
+n.col = 3 
+order.input = F
+
+fp <- lapply(telVSnontel_genes, FPlist)
+
+rel.height <- ceil(as.numeric(lapply(telVSnontel_genes, length))/n.col) #take the expected number of rows and based on length of markers for each cluster and the number of columns
+
+p.name <- 'FeaturePlot_ASTT2T3_Tel_vs_NonTel' # to use for export
+ plot_grid(plotlist = fp, ncol = 2, rel_heights = rel.height, labels = paste0(names(fp)), label_colour = '#ae2012', vjust = 1.05, label_size = 16, scale = 0.95) #merge plots for all clusters into one big figure for export
+```
+###  Agt is a marker for non-Tel and Tam107a, Mfge8 are markers for Telencephalon
+```{r fig.height=4, fig.width=9}
+n.col = 3 
+order.input = T
+FPlist(c('Agt','Fam107a','Mfge8'))
+DPlist(c('Agt','Fam107a','Mfge8'))
+```
+
+
+# IL15_annotation.marker
+Sub-annotations that keep track of the level of each marker
+
+```{r}
+AST_T2T3$IL15_annotation.marker.0 <- '' # Top vs bottom
+
+AST_T2T3$IL15_annotation.marker.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4,6))] <-  'Cspg5.Mfge8.Fam107a' #bottom
+AST_T2T3$IL15_annotation.marker.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1,0,5,2,3))] <-  'Agt' #top
+AST_T2T3$IL15_annotation.marker.0[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))] <-  '' #cycling
+
+AST_T2T3$IL15_annotation.marker.1 <- '' # L vs R
+
+AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))] <-  'Gpc5' 
+AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))] <-  'Clu'
+AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))] <-  'Gpc5.Gm12239'#Homeo
+AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))] <-  'Gpc5.Gm12239' #Homeo
+AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))] <-  'Gfap.Clu.Fxyd1' #DTA
+AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))] <-  'Gfap.Clu.Fxyd1' #DTA
+AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))] <-  'Gfap.Clu.Fxyd1' #DTA
+AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))] <-  '' #cycling
+
+AST_T2T3$IL15_annotation.marker.2 <- ''
+
+AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))] <-  ''
+AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))] <-  ''
+AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))] <-  'Kirrel3'
+AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))] <-  'Cox4i1'
+AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))] <-  'Vim'
+AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))] <-  'Tpt1'
+AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))] <-  'Vim.Tpt1'
+AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))] <-  '' #cycling
+
+AST_T2T3$IL15_annotation.marker.3 <- ''
+
+AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))] <-  ''
+AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))] <-  'Thbs4'
+AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))] <-  ''
+AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))] <-  ''
+AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))] <-  'Slc88a1'
+AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))] <-  ''
+AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))] <-  'C1qa.Snhg11'
+AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))] <-  'Top2a' #cycling
+
+```
+
+## Dimplots showing new annotations
+```{r fig.height=4, fig.width=6}
+DimPlot(AST_T2T3, group.by = 'IL15_annotation.marker.0', label = F, label.size = 3, repel = T) + NoAxes() + labs(title= 'IL15_annotation.marker.0')
+DimPlot(AST_T2T3, group.by = 'IL15_annotation.marker.1', label = F, label.size = 3, repel = T) + NoAxes() + labs(title= 'IL15_annotation.marker.1')
+DimPlot(AST_T2T3, group.by = 'IL15_annotation.marker.2', label = F, label.size = 3, repel = T) + NoAxes() + labs(title= 'IL15_annotation.marker.2')
+DimPlot(AST_T2T3, group.by = 'IL15_annotation.marker.3', label = F, label.size = 3, repel = T) + NoAxes() + labs(title= 'IL15_annotation.marker.3')
+```
+
+
+# IL15_annotation.1-3
+- Sun-annotations that take the short annotation and add the marker genes (marker.1 is annotation.1 etc)
+- Genes are not separated by level 
+```{r}
+
+AST_T2T3$IL15_annotation.0 <- ''
+
+AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))] <-  paste0(AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))],'_',AST_T2T3$IL15_annotation.marker.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))])
+AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))] <-  paste0(AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))],'_',AST_T2T3$IL15_annotation.marker.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))])
+AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))] <-  paste0(AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))],'_',AST_T2T3$IL15_annotation.marker.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))])
+AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))] <-  paste0(AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))],'_',AST_T2T3$IL15_annotation.marker.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))])
+AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))] <-  paste0(AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))],'_',AST_T2T3$IL15_annotation.marker.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))])
+AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))] <-  paste0(AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))],'_',AST_T2T3$IL15_annotation.marker.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))])
+AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))] <-  paste0(AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))],'_', AST_T2T3$IL15_annotation.marker.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))])
+AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))] <-  paste0(AST_T2T3$IL15_annotation.short[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))] ,'_',AST_T2T3$IL15_annotation.marker.0[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))]) #cycling
+
+AST_T2T3$IL15_annotation.1 <- ''
+
+AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))] <-  paste0(AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))],'.',AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))])
+AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))] <-  paste0(AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))],'.',AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))])
+AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))] <-  paste0(AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))],'.',AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))])
+AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))] <-  paste0(AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))],'.',AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))])
+AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))] <-  paste0(AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))],'.',AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))])
+AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))] <-  paste0(AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))],'.',AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))])
+AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))] <-  paste0(AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))],'.',AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))])
+AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))] <-  paste0(AST_T2T3$IL15_annotation.0[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))],'.',AST_T2T3$IL15_annotation.marker.1[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))]) #cycling
+
+AST_T2T3$IL15_annotation.2  <- ''
+
+AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))] <-  paste0(AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))],'.',AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))])
+AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))] <-  paste0(AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))],'.',AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))])
+AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))] <-  paste0(AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))],'.',AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))])
+AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))] <-  paste0(AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))],'.',AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))])
+AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))] <-  paste0(AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))],'.',AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))])
+AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))] <-  paste0(AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))],'.',AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))])
+AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))] <-  paste0(AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))],'.',AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))])
+AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))] <-  paste0(AST_T2T3$IL15_annotation.1[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))],'.',AST_T2T3$IL15_annotation.marker.2[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))]) #cycling
+
+AST_T2T3$IL15_annotation.3  <- ''
+
+AST_T2T3$IL15_annotation.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))] <-  paste0(AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))],'.',AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(4))])
+AST_T2T3$IL15_annotation.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))] <-  paste0(AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))],'.',AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(6))])
+AST_T2T3$IL15_annotation.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))] <-  paste0(AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))],'.',AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(1))])
+AST_T2T3$IL15_annotation.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))] <-  paste0(AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))],'.',AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(0))])
+AST_T2T3$IL15_annotation.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))] <-  paste0(AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))],'.',AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(5))])
+AST_T2T3$IL15_annotation.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))] <-  paste0(AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))],'.',AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(2))])
+AST_T2T3$IL15_annotation.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))] <-  paste0(AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))],'.',AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.3 %in% c(3))])
+AST_T2T3$IL15_annotation.3[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))] <-  paste0(AST_T2T3$IL15_annotation.2[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))],'.',AST_T2T3$IL15_annotation.marker.3[which(AST_T2T3$RNA_snn_res.0.4 %in% c(11))]) #cycling
+
+# reorder clusters 
+new.order <- names(table(AST_T2T3$IL15_annotation.0))
+AST_T2T3$IL15_annotation.0 <- factor(AST_T2T3$IL15_annotation.0, levels = new.order[order])
+new.order <- names(table(AST_T2T3$IL15_annotation.1))
+AST_T2T3$IL15_annotation.1 <- factor(AST_T2T3$IL15_annotation.1, levels = new.order[order])
+new.order <- names(table(AST_T2T3$IL15_annotation.2))
+AST_T2T3$IL15_annotation.2 <- factor(AST_T2T3$IL15_annotation.2, levels = new.order[order])
+new.order <- names(table(AST_T2T3$IL15_annotation.3))
+AST_T2T3$IL15_annotation.3 <- factor(AST_T2T3$IL15_annotation.3, levels = new.order[order])
+```
+
+```{r}
+table(AST_T2T3$RNA_snn_res.0.4)
+table(AST_T2T3$IL15_annotation.0)
+table(AST_T2T3$IL15_annotation.1)
+table(AST_T2T3$IL15_annotation.2)
+table(AST_T2T3$IL15_annotation.3)
+```
+
+
+## Dimplots showing new annotations
+```{r fig.height=4, fig.width=8}
+DimPlot(AST_T2T3, group.by = 'IL15_annotation.0', label = F, label.size = 3, repel = T) + NoAxes() + labs(title= 'IL15_annotation.0')
+DimPlot(AST_T2T3, group.by = 'IL15_annotation.1', label = F, label.size = 3, repel = T) + NoAxes() + labs(title= 'IL15_annotation.1')
+DimPlot(AST_T2T3, group.by = 'IL15_annotation.2', label = F, label.size = 3, repel = T) + NoAxes() + labs(title= 'IL15_annotation.2')
+DimPlot(AST_T2T3, group.by = 'IL15_annotation.3', label = F, label.size = 3, repel = T) + NoAxes() + labs(title= 'IL15_annotation.3')
+```
+
+## FeaturePlots showing new genes of each level of annotation
+```{r fig.height=7, fig.width=28}
+IL15_annotation_genes <- list(c('Cspg5','Mfge8','Fam107a','Agt'), c('Gpc5','Gm12239','Gfap','Clu','Fxyd1'),
+                          c('Kirrel3','Cox4i1','Vim','Tpt1'),
+                          c('Thbs4','Top2a','Slc38a1','C1qa','C1qb','C1qc','Snhg11'))
+
+names(IL15_annotation_genes) <- c("IL15_annotation.marker.0","IL15_annotation.marker.1","IL15_annotation.marker.2","IL15_annotation.marker.3")
+
+#order = T
+p.name <- 'DotPlot_IL15_annotation_genes_orderT' # to use for export
+order.input = T
+n.col = 2
+fp <- lapply(IL15_annotation_genes, FPlist)
+rel.height <- ceil(as.numeric(lapply(IL15_annotation_genes, length))/n.col) #take the expected number of rows and based on length of markers for each cluster and the number of columns
+plot_grid(plotlist = fp, ncol = 4, rel_heights = rel.height, labels = paste0(names(fp)), label_colour = '#ae2012', vjust = 1.05, label_size = 16, scale = 0.95) #merge plots for all clusters into one big figure for export
+
+#order = F
+p.name <- 'DotPlot_IL15_annotation_genes_orderF' # to use for export
+order.input = F
+n.col = 2
+fp <- lapply(IL15_annotation_genes, FPlist)
+rel.height <- ceil(as.numeric(lapply(IL15_annotation_genes, length))/n.col) #take the expected number of rows and based on length of markers for each cluster and the number of columns
+plot_grid(plotlist = fp, ncol =4, rel_heights = rel.height, labels = paste0(names(fp)), label_colour = '#ae2012', vjust = 1.05, label_size = 16, scale = 0.95) #merge plots for all clusters into one big figure for export
+
+# Dotplot
+p.name <- 'DotPlot_IL15_annotation_genes' # to use for export
+dp <- lapply(IL15_annotation_genes, DPlist)
+rel.height <- as.numeric(lapply(IL15_annotation_genes, length)) #take the expected number of rows and based on length of markers for each cluster and the number of columns
+plot_grid(plotlist = dp, ncol = 2, rel_heights = rel.height, labels = paste0(names(dp)), label_colour = '#ae2012', vjust = 1.0, label_size = 16, scale = 0.85, axis = 'l') #merge plots for all clusters into one big figure for export
+```
+
+## Make new dotplots that group by their corresponding level
+```{r fig.height=12, fig.width=16}
+DPlist.custGroup <- function(genes,names){
+   DotPlot(AST_T2T3,features=genes,group.by = names, dot.scale = 6,cluster.idents = F,col.max = 1.5, col.min = -1.5)+
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+  scale_colour_gradient2(low = "#046A83", mid = "white",high = '#D26952',midpoint = 0) + theme_light()  + 
+  rotate_x_text(60) +
+    theme( plot.margin = margin(b = 0, r = 20),
+          legend.position = 'right',
+          axis.title.x = element_text(size = 0),
+          axis.title.y = element_text(size = 0)) +
+    geom_point(aes(size = pct.exp), alpha = 0.25, shape = 21, color='black', stroke = 0.75)+
+  FontSize(x.text = 12,y.text = 12) + coord_flip()
+} #function to plot markers for each cluster 
+
+name <- c("IL15_annotation.0","IL15_annotation.1","IL15_annotation.2","IL15_annotation.3")
+
+
+dp <- mapply(DPlist.custGroup, names= name, genes = IL15_annotation_genes,SIMPLIFY = F)
+
+rel.height <- 2*as.numeric(lapply(IL15_annotation_genes, length)) #take the expected number of rows and based on length of markers for each cluster and the number of columns
+plot_grid(plotlist = dp, ncol = 2, rel_heights = rel.height, labels = paste0(names(dp)), label_colour = '#ae2012', vjust = 1.0, label_size = 16, scale = 0.85, axis = 'l')
+
+
+```
+
+
+
+# Functions for dotplots and feature plots split by a category with titles
+```{r}
+
+FPlist <- function(seuratobj,genes){
+    FeaturePlot(seuratobj, genes ,ncol = n.col,cols = c('grey90',paste0('#',c("4FB3AA","e9d8a6","ee9b00","ae2012"))),pt.size = 0.05, order = order.input) & NoAxes() 
+} #function to plot markers for each cluster 
+
+
+DPlist <- function(seuratobj,genes,resolution){
+   DotPlot(seuratobj,features=genes,group.by = resolution, dot.scale = 6,cluster.idents = F,col.max = 1.5, col.min = -1.5)+
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+  scale_colour_gradient2(low = "#046A83", mid = "white",high = '#D26952',midpoint = 0) + theme_light()  + 
+  rotate_x_text(60) +
+    theme( plot.margin = margin(b = 0, r = 20),
+          legend.position = 'right',
+          axis.title.x = element_text(size = 0),
+          axis.title.y = element_text(size = 0)) +
+    geom_point(aes(size = pct.exp), alpha = 0.25, shape = 21, color="black", stroke = 0.75)+
+  FontSize(x.text = 12,y.text = 12) + coord_flip()
+} #function to plot markers for each cluster 
+```
+
+
+Tel vs nonTel markers from MapMyCells paper
+```{r}
+Astro.TE <- unique(dput(scan(text="Aqp4,Cd38,Agt,Itih3,Rfx4,Dbx2,Prdm16,Nr2f1", what=",", sep = ',')))
+
+Astro.NonTE <- unique(dput(scan(text="Gja1,Lhx2,Gpc5,Nr2f1,Rfx4,Lhx2,Sox9,Nr2f1,Meis2", what=",", sep = ',')))
+
+order.input = F
+FPlist(genes = Astro.TE, seuratobj = AST_T2T3)| FPlist(genes = Astro.NonTE, seuratobj = AST_T2T3) 
+DPlist(genes = unique(c(Astro.TE,Astro.NonTE)), seuratobj = AST_T2T3, resolution = 'IL15_annotation.0')
+```
+
+
+```{r}
+saveRDS(AST_T2T3, '/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/1_data.input/1_DTA/Cleaned_T2T3only/AST_T2T3_20240804.RDS')
+```

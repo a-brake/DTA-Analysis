@@ -1,0 +1,1184 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r error=FALSE, message=FALSE, warning=FALSE, results=}
+library(dplyr)
+library(clustree)
+library(Seurat)
+library(patchwork)
+library(plyr)
+library(magrittr)
+library(tidyr)
+library(ggplot2)
+library(ggthemes)
+library(fs)
+library(roxygen2)
+library(utils)
+library(fs)
+library(knitr)
+library(purrr)
+library(reshape)
+library(ggplot2)
+library(matlab)
+library(matrixStats)
+library(cowplot)
+library(openxlsx)
+library(readxl)
+library(harmony)
+library(SoupX)
+library(DoubletFinder)
+library(ggpubr)
+library(pheatmap)
+library(dittoSeq)
+library(scales)
+library(gridExtra)
+library(stargazer)
+library(data.table)
+library(rmarkdown)
+library(monocle3)
+library(monocle)
+library(SeuratWrappers)
+library(monocle3)
+library(monocle)
+library(pheatmap)
+library(gprofiler2)
+library(stringr)
+library(RColorBrewer)
+library(moonBook)
+library(ggforce)
+library(yarrr)
+
+ basic.marker1 <- c( "Lepr", "Cemip", "Mag", "Pdgfra", "Gfap", "Slc1a2", "Ptprc", "Syt1", "Nrg1", "Tmem232", "Cux2", 'S100a8','Gad1', 'Slc17a7', 'Flt1', "Mbp", 'Tmem119', 'P2ry12', 'Trem2', 'Itgam', 'Itgax', 'Mecom', 'Pdgfrb', 'Acta2', 'Apoe', 'Top2a', 'Enpp6', 'Cspg4','Cd14')
+```
+
+# Function to save figures
+```{r}
+fig.path <- '/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/'
+
+fig.path.png <- '/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/1_PNG/AST'
+fig.path.png <- '/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/3_plots.output/2_PDF/AST'
+
+save.fig <- function(fig.path,p.name) {
+ggsave(filename = paste0(fig.path.pdf, 
+                         p.name,'_',
+                         'GROUP.',resolution, "_",
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.PDF'), 
+       limitsize = F) 
+  
+  ggsave(filename = paste0(fig.path.png,
+                         p.name,'_',
+                         'GROUP.',resolution, "_",
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.png'), 
+       limitsize = F) 
+}
+  
+```
+
+# AST analysis: starting with code from '/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/Popko.Vault/AST/Code/11.1_AST_reanalysis.Rmd'  
+
+```{r}
+AST_merged <-  readRDS('/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/data/rda/06_L2.Analysis/L2.all/06_AST/AST_all_cleaned_20220304.RDS')
+```
+
+### UPDATE INDEX LABELS
+```{r}
+index_labels <- read_excel('/Users/brakeam/Documents/Popko/snRNA-seq/Popko_snRNAseq_Analysis/data/index_labels_b1_b2_b3_b4.xlsx', sheet = 'IndexLabels')
+
+order <- match(AST_merged@meta.data$IL01_uniqueID, index_labels$IL01_uniqueID)
+AST_merged@meta.data$Test <- as.character(index_labels[order,]$Test)
+AST_merged@meta.data$IL02_species <- as.character(index_labels[order,]$IL02_species)
+AST_merged@meta.data$IL03_source.1 <- as.character(index_labels[order,]$IL03_source.1)
+AST_merged@meta.data$IL03_source.2 <- as.character(index_labels[order,]$IL03_source.2)
+AST_merged@meta.data$IL04_sex <- as.character(index_labels[order,]$IL04_sex)
+AST_merged@meta.data$IL05_ageDays <- as.character(index_labels[order,]$IL05_ageDays)
+AST_merged@meta.data$IL05_ageDays.1 <- as.character(index_labels[order,]$IL05_ageDays.1)
+AST_merged@meta.data$IL05_ageDays.2 <- as.character(index_labels[order,]$IL05_ageDays.2)
+AST_merged@meta.data$IL06_tissue.1 <- as.character(index_labels[order,]$IL06_tissue.1)
+AST_merged@meta.data$IL06_tissue.2 <- as.character(index_labels[order,]$IL06_tissue.2)
+AST_merged@meta.data$IL06_tissue.3 <- as.character(index_labels[order,]$IL06_tissue.3)
+AST_merged@meta.data$IL07_location <- as.character(index_labels[order,]$IL07_location)
+AST_merged@meta.data$IL08_condition <- as.character(index_labels[order,]$IL08_condition)
+AST_merged@meta.data$IL08_condition.1 <- as.character(index_labels[order,]$IL08_condition.1)
+AST_merged@meta.data$IL08_condition.2 <- as.character(index_labels[order,]$IL08_condition.2)
+AST_merged@meta.data$IL09_ilumina <- as.character(index_labels[order,]$IL09_ilumina)
+AST_merged@meta.data$IL10_chemistry <- as.character(index_labels[order,]$IL10_chemistry)
+AST_merged@meta.data$IL11_batch <- as.character(index_labels[order,]$IL11_batch)
+AST_merged@meta.data$IL12_LMinDays <- as.character(index_labels[order,]$IL12_LMinDays)
+AST_merged@meta.data$IL13_LmaxDays <- as.character(index_labels[order,]$IL13_LmaxDays)
+AST_merged@meta.data$IL14_dataset <- as.character(index_labels[order,]$IL14_dataset)
+AST_merged@meta.data$IL16_note <- as.character(index_labels[order,]$IL16_note)
+
+AST_merged$IL08_condition.5 <- ""
+AST_merged$IL08_condition.5 <- paste0(AST_merged$IL08_condition.2,"_",AST_merged$IL08_condition)
+
+AST_merged$IL08_condition.6 <- ''
+AST_merged$IL08_condition.6[which(AST_merged$IL08_condition %in% c('3w'))] <-  'T1_Onset'
+AST_merged$IL08_condition.6[which(AST_merged$IL08_condition %in% c('5w','~6.28w'))] <-  'T2_Peak'
+AST_merged$IL08_condition.6[which(AST_merged$IL08_condition %in% c('17w'))] <-  'T3_Recovery'
+AST_merged$IL08_condition.6[which(AST_merged$IL08_condition %in% c('~45w'))] <-  'T4_LateOnset'
+AST_merged$IL08_condition.6 <- factor(AST_merged$IL08_condition.6)
+
+
+
+AST_merged$IL08_condition.5 <- factor(AST_merged$IL08_condition.5, levels =c('ctrl_3w','DTA_3w','ctrl_5w', 'DTA_~6.28w','ctrl_17w', 'DTA_17w','ctrl_~45w','DTA_~45w'))
+
+AST_merged$IL08_condition.7 <- ""
+AST_merged$IL08_condition.7 <- paste0(AST_merged$IL08_condition.6,"_",AST_merged$IL08_condition.2)
+AST_merged$IL08_condition.7 <- factor(AST_merged$IL08_condition.7,levels =c('T1_Onset_ctrl','T2_Peak_ctrl','T3_Recovery_ctrl', 'T4_LateOnset_ctrl','T1_Onset_DTA','T2_Peak_DTA','T3_Recovery_DTA', 'T4_LateOnset_DTA'))
+
+AST_merged$IL08_condition.8 <- ""
+AST_merged$IL08_condition.8 <- paste0(AST_merged$IL08_condition.7,"_",AST_merged$IL06_tissue.1)
+AST_merged$IL08_condition.8 <- factor(AST_merged$IL08_condition.8,levels =c('T1_Onset_ctrl_GM','T2_Peak_ctrl_GM','T3_Recovery_ctrl_GM', 'T4_LateOnset_ctrl_GM','T1_Onset_DTA_GM','T2_Peak_DTA_GM','T3_Recovery_DTA_GM', 'T4_LateOnset_DTA_GM','T1_Onset_ctrl_WM','T2_Peak_ctrl_WM','T3_Recovery_ctrl_WM', 'T4_LateOnset_ctrl_WM','T1_Onset_DTA_WM','T2_Peak_DTA_WM','T3_Recovery_DTA_WM', 'T4_LateOnset_DTA_WM'))
+```
+
+################################  BEGIN REANALYSIS HERE   ################################  
+## Reanalysis step 1: 
+###  Subset T2 and T3 only
+```{r Subset T2 and T3 only}
+
+# Create new label with a title indicating the RNA_snn_res.0.3 label and the date generated (20240501) -- store the old RNA_snn_res.0.3 here before subsetting
+AST_merged$ALL_res0.3_20240501 <- AST_merged$RNA_snn_res.0.3
+
+# Subset just T2 and T3
+AST_T2T3<-subset(AST_merged,subset = IL08_condition.6 %in% c("T2_Peak","T3_Recovery"), invert = FALSE)
+
+# Check to make sure subset was successful -- yes 
+table(AST_T2T3$IL08_condition.6)
+
+DimPlot(AST_T2T3, split.by = 'IL08_condition.6')
+```
+
+### Redo UMAP for T2 and T3
+```{r}
+AST_T2T3 <- AST_T2T3  %>%
+    PercentageFeatureSet(pattern = "^mt-", col.name = "percent.mt") %>%
+    NormalizeData(normalization.method = "LogNormalize",verbose = FALSE,scale.factor = 10000) %>%
+    FindVariableFeatures(selection.method = "vst", nfeatures = 3000) %>%
+    ScaleData(verbose = FALSE) %>%
+    RunPCA(npcs = 50, verbose = FALSE) %>%
+    RunHarmony("IL01_uniqueID", plot_convergence = TRUE) %>%
+    RunUMAP(reduction = "harmony", dims = 1:6, min.dist=0.001, spread = 5,n.components = 2) %>% #1:5
+    FindNeighbors(reduction = "harmony", dims = 1:6) %>% #1:5
+    FindClusters(resolution = c(0.1,0.2,0.3,0.6,0.8,1.0,1.2,1.4,1.6,1.8,2.0)) %>%
+    identity()
+```
+
+### Compare resolutions
+```{r fig.height=3.5, fig.width=12}
+resolution <- 'ALL_res0.3_20240501' #res0.3 from AST_merged
+DimPlot(AST_T2T3, split.by = 'IL08_condition.7',group.by = resolution,label = T, ncol =4, label.size = 7) + NoAxes() + NoLegend() + labs(title = resolution)
+
+
+resolution <- 'RNA_snn_res.0.3'
+DimPlot(AST_T2T3, split.by = 'IL08_condition.7',group.by = resolution,label = T, ncol =4, label.size = 7) + NoAxes() + NoLegend() + labs(title = resolution)
+```
+
+## Transfer labels back from subset to merged object
+```{r Transfer clustering labels from subset to merged object: res0.3}
+index <- match(colnames(AST_T2T3),colnames(AST_merged))
+
+#Is index the right size? yes 
+length(index) == length(colnames(AST_T2T3)) #TRUE
+
+# Does the index reflect the position of each cell from the subset in the merged object? yes
+test <- colnames(AST_merged)[index] == colnames(AST_T2T3) 
+which(test == 'FALSE') #all true 
+
+#transfer labels
+AST_merged$T2T3_res0.3_20240501 <- 'Other'
+AST_merged$T2T3_res0.3_20240501[index] <-  as.character(AST_T2T3$RNA_snn_res.0.3)
+
+#Was transfer successful? 
+
+  ## yes all counts match up
+table(AST_merged$T2T3_res0.3_20240501) #Merged object
+table(AST_T2T3$RNA_snn_res.0.3) #Labels that were transferred in the subset object
+
+  ## are the correct cells labeled?
+test <- AST_merged$T2T3_res0.3_20240501[index] == AST_T2T3$RNA_snn_res.0.3 # are those cells given the same name in both objects?
+which(test == 'FALSE') #all true 
+
+# Convert back to a factor
+AST_merged$T2T3_res0.3_20240501 <- as.factor(AST_merged$T2T3_res0.3_20240501)
+
+```
+
+# Repeat label transfer for res 0.4 and 0.6
+```{r Transfer clustering labels from subset to merged object: res0.4 and 0.6}
+index <- match(colnames(AST_T2T3),colnames(AST_merged))
+
+#transfer labels
+## RNA_snn_res.0.4
+AST_merged$T2T3_res0.4_20240501 <- 'Other'
+AST_merged$T2T3_res0.4_20240501[index] <-  as.character(AST_T2T3$RNA_snn_res.0.4)
+## RNA_snn_res.0.6
+AST_merged$T2T3_res0.6_20240501 <- 'Other'
+AST_merged$T2T3_res0.6_20240501[index] <-  as.character(AST_T2T3$RNA_snn_res.0.6)
+
+
+```
+
+## Where do the transfered labels end up?
+```{r fig.height=4, fig.width=11}
+resolution <- 'T2T3_res0.3_20240501'
+DimPlot(AST_merged, split.by = 'IL08_condition.6',group.by = resolution,label = T, ncol =4, label.size = 7) + NoAxes() + NoLegend() + labs(title = resolution)
+
+resolution <- 'T2T3_res0.4_20240501'
+DimPlot(AST_merged, split.by = 'IL08_condition.6',group.by = resolution,label = T, ncol =4, label.size = 7) + NoAxes() + NoLegend() + labs(title = resolution)
+
+resolution <- 'T2T3_res0.6_20240501'
+DimPlot(AST_merged, split.by = 'IL08_condition.6',group.by = resolution,label = T, ncol =4, label.size = 7) + NoAxes() + NoLegend() + labs(title = resolution)
+
+resolution <- 'RNA_snn_res.0.3'
+DimPlot(AST_merged, split.by = 'IL08_condition.6',group.by = resolution,label = T, ncol =4, label.size = 7) + NoAxes() + NoLegend() + labs(title = resolution)
+
+# Comparing res0.3 in both objects, the clustering in the subset object tracked back to very similar clustering in the merged object. Cluster 7 and 8 in the merged object becomes a mix of cells from several clusters in the subset object. Cluster 7 becomes predominantly cluster 0 and cluster 8 is mostly cluster 3 (although there are several other clusters present)
+
+# T2T3_res0.4_20221226 tracked similarly, preserving cluster 7, but cluster 4 in T2 becomes mixed with cluster 1. 
+
+# T2T3_res0.6_20221226 is not consistent with the previous clustering. Resolution too high
+
+# Will move forward with Res0.3 for expression comparison
+```
+
+```{r Make index label with old and new labels combined for easier comparison}
+# Make index label with old and new labels combined for easier comparison
+AST_merged$res0.3_compare <- paste0(AST_merged$RNA_snn_res.0.3, '.all_',AST_merged$T2T3_res0.3_20240501,'.T2T3')
+
+table(AST_merged$res0.3_compare) 
+
+#find the clusters where only a few cells change identity and change name to other
+to.change <- names(which(table(AST_merged$res0.3_compare) < 200))
+
+AST_merged$res0.3_compare[which(AST_merged$res0.3_compare %in% to.change)] <- 'other'
+
+resolution <- 'res0.3_compare'
+DimPlot(AST_merged ,group.by = resolution,label = T, ncol =1, label.size = 0, repel = TRUE, cols = sample(colors(23))) + NoAxes() + labs(title = resolution)
+
+# Filtered table
+table(AST_merged$res0.3_compare) 
+```
+
+# Plot selected markers and compare in both UMAP spaces (subset vs non-subset)
+```{r Plot selected markers and compare across objects: Feature Plot, echo=TRUE, fig.height=6, fig.width=28}
+markers <-  c('Gfap','Aldh1l1','Apoe','Vim','Nrxn3','Fam155a','Snhg11','Tafa1','Tmsb4x','Gpc5','Tmem176a')
+
+p1 <- FeaturePlot(AST_merged, markers,ncol = 11,cols = c('grey90',paste0('#',c("4FB3AA","e9d8a6","ee9b00","ae2012"))),pt.size = 0.2) & NoAxes() 
+p2 <- FeaturePlot(AST_T2T3, markers,ncol = 11,cols = c('grey90',paste0('#',c("4FB3AA","e9d8a6","ee9b00","ae2012"))),pt.size = 0.2) & NoAxes() 
+
+p1 / p2
+```
+
+```{r Make a new subset object that has just T2 and T3 and preseves the AST_merged UMAP, echo=TRUE}
+AST_merged_T2T3 <-  subset(AST_merged,subset = IL08_condition.6 %in% c("T2_Peak","T3_Recovery"), invert = FALSE)
+```
+
+## Find markers for the T2T3 object clusters -- they might be cleaner now 
+```{r Find markers}
+Idents(AST_T2T3) <- AST_T2T3$RNA_snn_res.0.3
+
+clusters <- as.list(levels(Idents(AST_T2T3)))
+
+markers_T2T3_res0.3 <- lapply(clusters, FindMarkers,object = AST_T2T3)
+
+names(markers_T2T3_res0.3) <- paste0('RNA_snn_res.0.3_c',levels(Idents(AST_T2T3))) #rename the list items to match the cluster numbers
+
+markers_T2T3_res0.3
+
+### Save marker data 
+# saveRDS(markers_T2T3_res0.3, '/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_AllMarkers_Res0.3_20240501.rds')
+
+ # write.xlsx(markers_T2T3_res0.3,  paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/11_ASTReanalysis/AST_T2T3_AllMarkers_Res0.3_',
+ #           format(Sys.Date(), "%Y%m%d"),
+ #           '.xlsx'), rowNames = TRUE)
+ 
+########################################## Read marker data ########################################## 
+ markers_T2T3_res0.3 <-  readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_AllMarkers_Res0.3_20240501.rds')
+```
+
+```{r plot top10 markers for each cluster, fig.height=55, fig.width=25}
+# use apply to select top 10 markers from each list item
+
+top_markers_T2T3_res0.3 <- lapply(markers_T2T3_res0.3, filter, pct.1 >= 0.5, pct.2 < 0.4) # filter by upper and lower cutoff for pct1 and pct2
+top_markers_T2T3_res0.3.v2 <- lapply(markers_T2T3_res0.3, filter, pct.1 - pct.2 > 0.25) # filter by a minimum difference between pct1 and pct2
+top_markers_T2T3_res0.3.v3 <- lapply(markers_T2T3_res0.3, filter, pct.1 - pct.2 > mean(pct.1 - pct.2) ) # Take markers with difference greater than the mean
+top_markers_T2T3_res0.3.v4 <- lapply(markers_T2T3_res0.3, filter, (pct.1 - pct.2) > quantile(pct.1 - pct.2, probs = 0.98), pct.1 > 0.6) # Take markers with pct1 - pct2 difference in the top 2% and with pct1 > 0.6
+top_markers_T2T3_res0.3_rownames <- lapply(top_markers_T2T3_res0.3.v4, rownames)
+
+markers.toexport <- bind_rows(top_markers_T2T3_res0.3.v4, .id = 'Cluster') %>% #merge list of markers into one dataframe, new column for cluster number
+  setorder(-avg_logFC) #sort by average log FC
+paged_table(markers.toexport) # display table
+
+markers.toexport$gene <- gsub(pattern = "\\.\\.\\.(.+)", x = rownames(markers.toexport), replacement = '') #remove text after gene name for duplicated marker
+
+markers.toexport
+
+#then use lapply to plot each cluster's markers
+
+
+## FEATURE PLOT ##
+n.col = 4 
+
+FPlist <- function(genes){
+    FeaturePlot(AST_T2T3, genes ,ncol = n.col,cols = c('grey90',paste0('#',c("4FB3AA","e9d8a6","ee9b00","ae2012"))),pt.size = 0.05) & NoAxes() 
+} #function to plot markers for each cluster 
+
+fp <- lapply(top_markers_T2T3_res0.3_rownames, FPlist)
+
+rel.height <- ceil(as.numeric(lapply(top_markers_T2T3_res0.3_rownames, length))/n.col) #take the expected number of rows and based on length of markers for each cluster and the number of columns
+
+p.name <- 'FeaturePlot_ASTT2T3_RNA_snn_res.0.3_All' # to use for export
+ plot_grid(plotlist = fp, ncol = 1, rel_heights = rel.height, labels = paste0('Cluster ', names(fp)), label_colour = '#ae2012', vjust = 1.05, label_size = 16, scale = 0.95) #merge plots for all clusters into one big figure for export
+
+  plot_grid(plotlist = fp, ncol = 1, rel_heights = rel.height, labels = paste0('Cluster ', names(fp)), label_colour = '#ae2012', vjust = 1.05, label_size = 16, scale = 0.95) | plot_grid(plotlist = dp, ncol = 2, labels = paste0('Cluster ', names(dp)), label_colour = '#ae2012', vjust = 1.2, label_size = 18, scale = 0.85, axis = 'l') #merge plots for all clusters into one big figure for export
+ 
+  ggsave(filename = paste0(fig.path,
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.PDF'), 
+       limitsize = F,
+       height = 2*(sum(as.numeric(lapply(top_markers_T2T3_res0.3_rownames, length)))/n.col) + 4,
+       width = n.col*2.5,
+        bg = "white")
+ 
+ ggsave(filename = paste0(fig.path,
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.png'), 
+       limitsize = F,
+       height = 2*(sum(as.numeric(lapply(top_markers_T2T3_res0.3_rownames, length)))/n.col) + 4,
+       width = n.col*2.5,
+        bg = "white")
+
+## DOT PLOT ##
+resolution = 'RNA_snn_res.0.3'
+DPlist <- function(genes){
+   DotPlot(AST_merged,features=genes,group.by = resolution, dot.scale = 6,cluster.idents = F,col.max = 1.5, col.min = -1.5)+
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+  scale_colour_gradient2(low = "#046A83", mid = "white",high = '#D26952',midpoint = 0) + theme_light()  + 
+  rotate_x_text(60) +
+    theme( plot.margin = margin(b = 0, r = 20),
+          legend.position = 'right',
+          axis.title.x = element_text(size = 0),
+          axis.title.y = element_text(size = 0)) +
+    geom_point(aes(size = pct.exp), alpha = 0.25, shape = 21, color="black", stroke = 0.75)+
+  FontSize(x.text = 12,y.text = 12) + coord_flip()
+} #function to plot markers for each cluster 
+
+dp <- lapply(top_markers_T2T3_res0.3_rownames, DPlist)
+
+rel.height <- as.numeric(lapply(top_markers_T2T3_res0.3_rownames, length)) #take the expected number of rows and based on length of markers for each cluster and the number of columns
+
+p.name <- 'DotPlot_ASTT2T3_RNA_snn_res.0.3_All' # to use for export
+ plot_grid(plotlist = dp, ncol = 2, rel_heights = rel.height, labels = paste0('Cluster ', names(dp)), label_colour = '#ae2012', vjust = 1.0, label_size = 16, scale = 0.85, axis = 'l') #merge plots for all clusters into one big figure for export
+ 
+  plot_grid(plotlist = dp, ncol = 2, labels = paste0('Cluster ', names(dp)), label_colour = '#ae2012', vjust = 1.2, label_size = 18, scale = 0.85, axis = 'l') #merge plots for all clusters into one big figure for export
+
+ 
+ ggsave(filename = paste0(fig.path,
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.PDF'), 
+       limitsize = F,
+       height = 30,
+       width = 15,
+        bg = "white")
+  
+ ggsave(filename = paste0(fig.path,
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.png'), 
+       limitsize = F,
+       height = 20,
+       width = 10,
+        bg = "white")
+ 
+
+ # Save selected marker data to csv
+ write.table(markers.toexport, 
+            paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_top_markers_T2T3_res0.3.v4_',
+           format(Sys.Date(), "%Y%m%d"),
+           '.csv'),
+           append= F, 
+           sep=',',
+           row.names = TRUE,
+           col.names = NA)
+ 
+ 
+```
+
+
+```{r save object}
+saveRDS(AST_T2T3, '/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/1_data.input/1_DTA/Cleaned_T2T3only/AST_T2T3_20240516.RDS')
+```
+
+#############################################################################
+```{r load object}
+AST_T2T3 <-readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/1_data.input/1_DTA/Cleaned_T2T3only/AST_T2T3_20240516.RDS')
+```
+
+### Gene module analysis
+```{r set-up CDS}
+CDS <- as.cell_data_set(AST_T2T3) %>%
+  estimate_size_factors()
+
+## Add gene names into CDS
+CDS@rowRanges@elementMetadata@listData[["gene_short_name"]] <- rownames(AST_T2T3[["RNA"]])
+
+
+CDS <- cluster_cells(CDS,reduction_method = "UMAP")
+CDS <- learn_graph(CDS, use_partition = TRUE)
+
+## Saved 06/14/2024
+saveRDS(CDS,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_GeneModule_knn_CDS_',
+           format(Sys.Date(), "%Y%m%d"),
+           '.rds'))
+
+########################################## Read saved object ########################################## 
+CDS <- readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_GeneModule_knn_CDS_20240502.rds')
+```
+
+# There are two approaches for differential analysis in Monocle: regression analysis (fit_models) and graoh autocorrelation (graph_test)
+  ## Regression analysis: using *fit_models()*, you can evaluate whether each gene depends on variables such as time, treatments, etc.
+    ### IL08_condition.7
+```{r fit_models}
+gene_fits <- fit_models(CDS, model_formula_str = "~IL08_condition.7")
+
+saveRDS(gene_fits,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_GeneFits_IL08condition7_',
+           format(Sys.Date(), "%Y%m%d"),
+           '.csv'))
+saveRDS(gene_fits,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_GeneFits_IL08condition7_',
+           format(Sys.Date(), "%Y%m%d"),
+           '.rds'))
+
+########################################## Read saved object ########################################## 
+gene_fits <- readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_GeneFits__IL08condition7_20240508.rds')
+
+
+fit_coefs <- coefficient_table(gene_fits)
+
+DTA_terms <- fit_coefs 
+DTA_terms<- filter(DTA_terms,q_value < 0.01) %>%
+         select(gene_short_name, term, q_value, estimate,model,num_cells_expressed)
+
+eval.fit <- monocle3::evaluate_fits(DTA_terms)
+
+saveRDS(eval.fit,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_GeneFits_evaluate_fits_IL08condition7_',
+           format(Sys.Date(), "%Y%m%d"),
+           '.csv'))
+saveRDS(eval.fit,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_GeneFits_evaluate_fits_IL08condition7_',
+           format(Sys.Date(), "%Y%m%d"),
+           '.rds'))
+
+########################################## Read saved object ########################################## 
+eval.fit <- readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_GeneFits_evaluate_fits_IL08condition7_20240511.rds')
+```
+
+```{r filter marker genes from fit_models and plot fig.height=25, fig.width=5}
+table((DTA_terms['term']))
+
+DTA_terms.sub <- DTA_terms %>% filter(term != "(Intercept)") %>% filter(abs(estimate)>1) %>% filter(num_cells_expressed > 10000)
+
+CDS_sub <- CDS[rowData(CDS)$gene_short_name %in% head(unique(DTA_terms.sub$gene_short_name),200)]
+
+monocle3::plot_genes_by_group(CDS_sub,markers = head(unique(DTA_terms.sub$gene_short_name),200), group_cells_by="IL08_condition.7") +
+      theme(axis.text.x=element_text(angle=45, hjust=1))
+
+
+```
+
+##Graph-autocorrelation analysis: using *graph_test()*, you can find genes that vary over a trajectory or between clusters.
+     - The function graph_test() uses a statistic from spatial autocorrelation analysis called Moran's I, which Cao & Spielmann et al showed to be effective in finding genes that vary in single-cell RNA-seq datasets.
+     - The data frame pr_graph_test_res has the Moran's I test results for each gene in the cell_data_set. If you'd like to rank the genes by effect size, sort this table by the morans_Icolumn, which ranges from -1 to +1. A value of 0 indicates no effect, while +1 indicates perfect positive autocorrelation and suggests that nearby cells have very similar values of a gene's expression. Significant values much less than zero are generally rare.
+     - Positive values indicate a gene is expressed in a focal region of the UMAP space (e.g. specific to one or more clusters). But how do we associate genes with clusters? The next section explains how to collect genes into modules that have similar patterns of expression and associate them with clusters.
+     
+*Principal graph method:* How do we find the genes that are differentially expressed on the different paths through the trajectory? How do we find the ones that are restricted to the beginning of the trajectory? Or excluded from it?
+Once again, we turn to graph_test(), this time passing it neighbor_graph="principal_graph", which tells it to test whether cells at similar positions on the trajectory have correlated expression:
+
+```{r GeneModule-longstep_GraphTest fig.height=6 fig.width=3}
+
+`%notin%` <- Negate(`%in%`)
+
+#knn method  
+pr_graph_test_res_KNN <- graph_test(CDS, neighbor_graph="knn", cores=6) ##long step
+pr_deg_ids_KNN <- row.names(subset(pr_graph_test_res_KNN, q_value < 0.05))
+
+# saveRDS(pr_graph_test_res_KNN,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_GeneModule_knn_pr_graph_test_res_',
+#            format(Sys.Date(), "%Y%m%d"),
+#            '.csv'))
+# saveRDS(pr_graph_test_res_KNN,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_GeneModule_knn_pr_graph_test_res_',
+#            format(Sys.Date(), "%Y%m%d"),
+#            '.rds'))
+
+pr_deg_ids_KNN <- readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_GeneModule_knn_pr_graph_test_res_20240502.rds')
+
+
+
+#principal graph method
+pr_graph_test_res_PR <- graph_test(CDS, neighbor_graph="principal_graph", cores=6) ##long step
+pr_deg_ids_PR <- row.names(subset(pr_graph_test_res_PR, q_value < 0.05))
+
+# saveRDS(pr_graph_test_res_PR,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_GeneModule_PrincipalGraph_pr_graph_test_res_',
+#            format(Sys.Date(), "%Y%m%d"),
+#            '.csv'))
+# saveRDS(pr_graph_test_res_PR,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_GeneModule_PrincipalGraph_pr_graph_test_res_',
+#            format(Sys.Date(), "%Y%m%d"),
+#            '.rds'))
+
+
+```
+
+```{r FP knn morans_I fig.height=15, fig.width=30}
+genes <- row.names(subset(pr_graph_test_res_KNN, morans_I > 0.35))
+FeaturePlot(AST_T2T3, genes ,ncol = 10,cols = c('grey90',paste0('#',c("4FB3AA","e9d8a6","ee9b00","ae2012"))),pt.size = 0.05, order = F) & NoAxes() 
+```
+
+```{r heatmaps fig.height=6 fig.width=3}
+
+## Heatmap by cluster
+pr_deg_ids <- pr_deg_ids_KNN
+gene_module_df <- find_gene_modules(CDS[pr_deg_ids,],verbose = T,random_seed = 1,resolution=1e-2)
+
+saveRDS(gene_module_df,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_GeneModule_knn_Modules_',
+           format(Sys.Date(), "%Y%m%d"),
+           '.csv'))
+saveRDS(gene_module_df,paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_GeneModule_knn_Modules_',
+           format(Sys.Date(), "%Y%m%d"),
+           '.rds'))
+
+
+cell_group_df <- tibble::tibble(cell=row.names(colData(CDS)), 
+                                cell_group=clusters(CDS)[colnames(CDS)])
+agg_mat <- aggregate_gene_expression(CDS, gene_module_df, cell_group_df)
+row.names(agg_mat) <- stringr::str_c("Module ", row.names(agg_mat))
+
+pheatmap::pheatmap(agg_mat, cluster_rows=FALSE, cluster_cols=FALSE,
+                   scale="column", clustering_method="ward.D2",
+                   fontsize=6)
+
+## Heatmap by RNA_snn_res.0.3
+cell_group_df <- tibble::tibble(cell=row.names(colData(CDS)), 
+                                cell_group=CDS@colData@listData[["RNA_snn_res.0.3"]])
+# reorder clusters 
+# new.order <- names(table(cell_group_df$cell_group))
+# cell_group_df$cell_group <- factor(cell_group_df$cell_group, levels = new.order[c(2,1,6,3,4,7,5)])
+
+agg_mat <- aggregate_gene_expression(CDS, gene_module_df , cell_group_df)
+row.names(agg_mat) <- stringr::str_c("Module ", row.names(agg_mat))
+
+
+pheatmap::pheatmap(agg_mat, cluster_rows=TRUE, cluster_cols=FALSE,
+                   scale="column", clustering_method="ward.D2",
+                   fontsize=12) + theme(axis.text.x = element_text(angle = 30, hjust = 1),plot.margin = margin(20,20,20))
+
+p.name <- c('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/pheatmap.RNA_snn_res.0.3.pdf')
+
+pheatmap::pheatmap(agg_mat, cluster_rows=FALSE, cluster_cols=FALSE, cellheight = 20,cellwidth = 20,filename = p.name,
+                   scale="column", clustering_method="ward.D2",
+                   fontsize=12) + theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+p.name <- c('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/pheatmap.RNA_snn_res.0.3.png')
+
+pheatmap::pheatmap(agg_mat, cluster_rows=FALSE, cluster_cols=FALSE, cellheight = 20,cellwidth = 20,filename = p.name,
+                   scale="column", clustering_method="ward.D2",
+                   fontsize=12) + theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+
+
+## Heatmap by IL08_condition.7
+cell_group_df <- tibble::tibble(cell=row.names(colData(CDS)), 
+                                cell_group=CDS@colData@listData[["IL08_condition.7"]])
+agg_mat <- aggregate_gene_expression(CDS, gene_module_df, cell_group_df)
+row.names(agg_mat) <- stringr::str_c("Module ", row.names(agg_mat))
+
+#agg_mat <- agg_mat[, c('T1_Onset_ctrl_WM', 'T1_Onset_DTA_WM','T1_Onset_ctrl_GM', 'T1_Onset_DTA_GM', 'T2_Peak_ctrl_WM', 'T2_Peak_DTA_WM', 'T2_Peak_ctrl_GM', 'T2_Peak_DTA_GM','T3_Recovery_ctrl_WM', 'T3_Recovery_DTA_WM', 'T3_Recovery_ctrl_GM', 'T3_Recovery_DTA_GM','T4_LateOnset_ctrl_WM','T4_LateOnset_DTA_WM',  'T4_LateOnset_ctrl_GM', 'T4_LateOnset_DTA_GM')] 
+
+p.name <- c('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/pheatmap.IL08_condition.7.pdf')
+
+pheatmap::pheatmap(agg_mat, cluster_rows=FALSE, cluster_cols=FALSE, cellheight = 20,cellwidth = 20,filename = p.name,
+                   scale="column", clustering_method="ward.D2",
+                   fontsize=12) + theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+p.name <- c('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/pheatmap.IL08_condition.7.png')
+
+pheatmap::pheatmap(agg_mat, cluster_rows=FALSE, cluster_cols=FALSE, cellheight = 20,cellwidth = 20,filename = p.name,
+                   scale="column", clustering_method="ward.D2",
+                   fontsize=12) + theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+```
+
+```{r make gene module plots fig.height=9, fig.width= 11}
+FF <- 0
+PT <- 0.05
+
+AST_T2T3 <- AddModuleScore(AST_T2T3,features = list(gene_module_df$id))
+
+gene_module_df.list <- split(gene_module_df, f = gene_module_df$module) 
+
+feature.plot <- list()
+heatmap <- list()
+cells <- list()
+terms <- list()
+
+for (L in 1:length(gene_module_df.list)){ #c(3,5,10,14,21)){ #1:length(gene_module_df.list)
+  tryCatch({
+    
+for.go <- gene_module_df.list[[L]] 
+for.go.clean <- str_replace(for.go$id, "mt-", "*")
+
+    
+gost.out <- gost(for.go.clean, organism = "mmusculus", ordered_query = F, multi_query = FALSE, significant = T, exclude_iea = F, measure_underrepresentation = FALSE, evcodes = T, user_threshold = PT, correction_method = "g_SCS", domain_scope = c("annotated"), custom_bg = NULL, numeric_ns = "", sources = NULL)
+      
+
+tt.temp <- gost.out[["result"]]
+tt.temp <- dplyr::filter(tt.temp, source %in% c('GO:MF','GO:CC','GO:BP')) #,'HP','REAC')) #keep these sources
+
+to.exclude <- intersect(tt.temp$term_id, unlist(tt.temp$parents))
+length(to.exclude)
+
+tt <- tt.temp[which(tt.temp$term_id %notin% to.exclude), ]
+tt <- tt[which(sapply(tt$parents, length) > FF), ]
+
+
+tt$fold.enrich <- (tt$intersection_size/tt$query_size)/(tt$term_size/tt$effective_domain_size)
+tt2 <- tt[, c("fold.enrich", "term_name", "source", "p_value")]
+tt2$term_name = with(tt2, reorder(term_name, -p_value))
+
+terms[[L]] <- as.character(tt.temp$term_name)
+
+  p.name <- paste0('Module.Features.mod',L,
+                   'bigtext')
+
+
+ggplot(tt2, aes(x = p_value, y = term_name)) +
+  geom_point(aes(color = source, size = fold.enrich), alpha = 0.5) +
+  scale_color_manual(values = c(colorsp(10))) +
+  scale_size(range = c(1, 10)) + scale_y_discrete(position = "right") + ggtitle(paste0("Knn.m",L)) + theme_minimal() + theme(axis.text.y = element_text(size =20),axis.text.x =element_text(size =15) ) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + theme(legend.position="bottom", legend.box = "vertical") + ylab('') + theme(legend.text=element_text(size=8)) + xlim(c(0,0.05))+ theme(plot.margin = unit(c(0, .5, .5, 1.5), "in")) + guides(size = guide_legend(order = 1),col = guide_legend(order = 2)) + theme(
+    legend.position = c(.97, .97),
+    legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    legend.background = element_rect(fill="white", color = 'grey90',size=.5)
+    )
+
+    ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/',
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.PDF'),
+       limitsize = F, height = 20,width = 30)
+    
+    ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/',
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.png'),
+       limitsize = F, height = 20,width = 30)
+
+
+agg_mat.sub <- matrix(subset(agg_mat, agg_mat@Dimnames[[1]] == paste0('Module ',L)))
+
+
+p.name <- paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/pheatmap.module_',L,'.pdf')
+
+pheatmap::pheatmap(agg_mat.sub, cluster_rows=FALSE, cluster_cols=FALSE,
+                   scale="column", clustering_method="ward.D2",clustering_distance_rows = 'correlation', cellwidth = 10, cellheight = 10,filename = p.name,
+                   fontsize=12) + theme(axis.text.x = element_text(angle = 30, hjust = 1)) 
+
+
+ p.name <- paste0('AST_Cell.Plot.mod',L)
+
+cells[[L]] <-  plot_cells(CDS, 
+           genes=gene_module_df %>% filter(module %in% c(L)),
+           group_cells_by="cluster",
+                      label_cell_groups = FALSE,
+           label_groups_by_cluster = FALSE,
+           cell_size = .3,
+           show_trajectory_graph=FALSE)+ NoAxes()  + 
+  scale_colour_gradientn(colors = c("grey90",  "navy",'cyan4','chartreuse')) 
+
+plot_cells(CDS, 
+           genes=gene_module_df %>% filter(module %in% 3),
+           group_cells_by="cluster",
+                      label_cell_groups = FALSE,
+           label_groups_by_cluster = FALSE,
+           cell_size = .5,
+           show_trajectory_graph=FALSE)+ NoAxes() + 
+  scale_colour_gradientn(colors = c("grey90",  "navy",'cyan4','chartreuse')) 
+
+
+ ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/GO_Analysis/',
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.PDF'),
+       limitsize = F, height = 3,width = 3.5)
+
+ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/GO_Analysis/',
+                         p.name,'_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.png'), height = 3, width = 3.5)
+######
+
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+do.call("plot_grid", c(cells,ncol = 4))
+ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_Cell.Plot.combined_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.PDF'),
+       limitsize = F, height = 11,width = 13)
+
+ggsave(filename = paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_Cell.Plot.combined_',
+                         format(Sys.Date(), "%Y%m%d"),
+                         '.png'), height = 11, width = 13)
+
+#do.call("plot_grid", c(feature.plot,ncol = 3)) 
+ 
+  Reduce(intersect, list(terms[[3]],terms[[9]],terms[[15]]))
+    Reduce(intersect, list(terms[[3]],terms[[8]]))
+  
+
+```
+
+```{r gene module analysis for selected regions}
+cds_choose <- choose_cells(CDS)
+subset_pr_test_res.sub <- graph_test(cds_choose, neighbor_graph="principal_graph", cores=4)
+pr_deg_ids.sub <- row.names(subset(subset_pr_test_res.sub, q_value < 0.05))
+gene_module_df.sub <- find_gene_modules(cds_choose[pr_deg_ids.sub,], resolution=0.001)
+
+agg_mat <- aggregate_gene_expression(cds_choose, gene_module_df.sub)
+module_dendro <- hclust(dist(agg_mat))
+gene_module_df.sub$module <- factor(gene_module_df.sub$module, 
+                                levels = row.names(agg_mat)[module_dendro$order])
+
+plot_cells(cds_choose,
+           genes=gene_module_df.sub,
+           label_cell_groups=FALSE,
+           show_trajectory_graph=FALSE)
+```
+
+```{r Make plots for each module terms and plotcells fig.height=5, fig.width= 5}
+FF <- 0
+PT <- 0.05
+
+AST_T2T3.sub <- subset(AST_T2T3,cells = colnames(cds_choose))
+AST_T2T3.sub <- AddModuleScore(AST_T2T3,features = list(gene_module_df.sub$id))
+
+gene_module_df.list <- split(gene_module_df.sub, f = gene_module_df.sub$module) 
+
+feature.plot <- list()
+heatmap <- list()
+cells <- list()
+terms <- list()
+termplot <- list()
+
+for (L in 1:length(gene_module_df.list)){ #c(3,5,10,14,21)){ #1:length(gene_module_df.list)
+  tryCatch({
+    
+for.go <- gene_module_df.list[[L]] 
+for.go.clean <- str_replace(for.go$id, "mt-", "*")
+
+    
+gost.out <- gost(for.go.clean, organism = "mmusculus", ordered_query = F, multi_query = FALSE, significant = T, exclude_iea = F, measure_underrepresentation = FALSE, evcodes = T, user_threshold = PT, correction_method = "g_SCS", domain_scope = c("annotated"), custom_bg = NULL, numeric_ns = "", sources = NULL)
+      
+
+tt.temp <- gost.out[["result"]]
+tt.temp <- dplyr::filter(tt.temp, source %in% c('GO:MF','GO:CC','GO:BP')) #,'HP','REAC')) #keep these sources
+
+to.exclude <- intersect(tt.temp$term_id, unlist(tt.temp$parents))
+length(to.exclude)
+
+tt <- tt.temp[which(tt.temp$term_id %notin% to.exclude), ]
+tt <- tt[which(sapply(tt$parents, length) > FF), ]
+
+
+tt$fold.enrich <- (tt$intersection_size/tt$query_size)/(tt$term_size/tt$effective_domain_size)
+tt2 <- tt[, c("fold.enrich", "term_name", "source", "p_value")]
+tt2$term_name = with(tt2, reorder(term_name, -p_value))
+
+terms[[L]] <- as.character(tt.temp$term_name)
+
+  p.name <- paste0('Module.Features.mod',L,
+                   'bigtext')
+
+
+termplot[[L]] <- ggplot(tt2, aes(x = p_value, y = term_name)) +
+  geom_point(aes(color = source, size = fold.enrich), alpha = 0.5) +
+  scale_color_manual(values = c(colorsp(10))) +
+  scale_size(range = c(1, 10)) + scale_y_discrete(position = "right") + ggtitle(paste0("Knn.m",L)) + theme_minimal() + theme(axis.text.y = element_text(size =8),axis.text.x =element_text(size =10) ) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + theme(legend.position="bottom", legend.box = "vertical") + ylab('') + theme(legend.text=element_text(size=8)) + xlim(c(0,0.05))+ theme(plot.margin = unit(c(0, .5, .5, 1.5), "in")) + guides(size = guide_legend(order = 1),col = guide_legend(order = 2)) + theme(
+    legend.position = c(.97, .97),
+    legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    legend.background = element_rect(fill="white", color = 'grey90',size=.5)
+    )
+
+
+p.name <- paste0('AST_Cell.Plot.mod',L)
+
+cells[[L]] <-  plot_cells(cds_choose, 
+           genes=gene_module_df.sub %>% filter(module %in% c(L)),
+           group_cells_by="cluster",
+                      label_cell_groups = FALSE,
+           label_groups_by_cluster = FALSE,
+           cell_size = .3,
+           show_trajectory_graph=FALSE)+ NoAxes()  + 
+  scale_colour_gradientn(colors = c("grey90",  "navy",'cyan4','chartreuse')) 
+
+plot_cells(cds_choose, 
+           genes=gene_module_df.sub %>% filter(module %in% 1),
+           group_cells_by="cluster",
+                      label_cell_groups = FALSE,
+           label_groups_by_cluster = FALSE,
+           cell_size = .5,
+           show_trajectory_graph=FALSE)+ NoAxes() + 
+  scale_colour_gradientn(colors = c("grey90",  "navy",'cyan4','chartreuse')) 
+######
+
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+do.call("plot_grid", c(cells,ncol = 2))
+```
+
+# Module Heatmaps
+```{r Gene Module heatmaps grouped by clustering and condition fig.height=2, fig.width=4}
+## Heatmap by RNA_snn_res.0.3
+cell_group_df <- tibble::tibble(cell=row.names(colData(cds_choose)), 
+                                cell_group=cds_choose@colData@listData[["RNA_snn_res.0.3"]])
+
+agg_mat <- aggregate_gene_expression(cds_choose, gene_module_df.sub , cell_group_df)
+row.names(agg_mat) <- stringr::str_c("Module ", row.names(agg_mat))
+
+
+pheatmap::pheatmap(agg_mat, cluster_rows=TRUE, cluster_cols=FALSE,
+                   scale="column", clustering_method="ward.D2",
+                   fontsize=12) + theme(axis.text.x = element_text(angle = 30, hjust = 1),plot.margin = margin(20,20,20))
+
+## Heatmap by IL08_condition.6
+cell_group_df <- tibble::tibble(cell=row.names(colData(cds_choose)), 
+                                cell_group=cds_choose@colData@listData[["IL08_condition.7"]])
+
+agg_mat <- aggregate_gene_expression(cds_choose, gene_module_df.sub , cell_group_df)
+row.names(agg_mat) <- stringr::str_c("Module ", row.names(agg_mat))
+
+
+pheatmap::pheatmap(agg_mat, cluster_rows=TRUE, cluster_cols=FALSE,
+                   scale="column", clustering_method="ward.D2",
+                   fontsize=12) + theme(axis.text.x = element_text(angle = 30, hjust = 1),plot.margin = margin(20,20,20))
+
+```
+
+# Plot terms
+```{r fig.height=3.5, fig.width=6}
+do.call("plot_grid", c(termplot,ncol = 2))
+termplot[[4]]
+```
+
+# DotPlot markers for individual module
+```{r Dot Plot, fig.height=4, fig.width=4}
+pr_deg_ids <- pr_deg_ids_KNN
+gene_module_df <- find_gene_modules(CDS[pr_deg_ids,],verbose = T,random_seed = 1,resolution=1e-2)
+
+resolution <- 'RNA_snn_res.0.3'
+markers <- unique(gene_module_df[which(gene_module_df$module %in% 10),])
+markers <- markers$id
+
+# markers <- c('Mt1','Mt2','Fxyd1','Dbi')
+ p <- DotPlot(AST_T2T3,features=markers,group.by = resolution, dot.scale = 6,cluster.idents = T,col.max = 1.5, col.min = -1.5)
+ 
+ df <- p$data %>% filter(pct.exp > 10)
+ 
+ DotPlot(AST_T2T3,features=unique(df$features.plot),group.by = resolution, dot.scale = 6,cluster.idents = T)+
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+  scale_colour_gradient2(low = "#046A83", mid = "white",high = '#D26952',midpoint = 0) + theme_light()  + 
+  rotate_x_text(60) +
+    theme( plot.margin = margin(b = 0, r = 20),
+          legend.position = 'right',
+          axis.title.x = element_text(size = 0),
+          axis.title.y = element_text(size = 0)) +
+    geom_point(aes(size = pct.exp), alpha = 0.25, shape = 21, color="black", stroke = 0.75)+
+  FontSize(x.text = 12,y.text = 12) + coord_flip()
+
+```
+
+```{r}
+FeaturePlot(AST_T2T3, markers,ncol = 4,cols = c('grey90',paste0('#',c("4FB3AA","e9d8a6","ee9b00","ae2012"))),pt.size = 0.2, order = F) & NoAxes() 
+VlnPlot(AST_T2T3, markers, group.by = "RNA_snn_res.0.3",ncol = 7,pt.size = 0)
+```
+
+```{r Plot Relative proportion echo=TRUE, fig.height=6, fig.width=8}
+resolution <- "RNA_snn_res.0.3"
+data <- AST_T2T3@meta.data %>% dplyr::select(RNA_snn_res.0.3,IL08_condition.7) %>%  mutate(IL08_condition.7 = factor(IL08_condition.7)) %>% group_by(IL08_condition.7)  %>% #IL08_condition.2, IL06_tissue.1,IL08_condition
+  table() %>% 
+  as.data.frame()
+
+
+ data.list <- split(data,data$IL08_condition.7)
+ 
+total <- ''
+for(i in 1:length(data.list)){
+  total[i] <- sum(data.list[[i]]$Freq)
+}
+
+data <- data %>%
+  mutate(totals = as.numeric(rep(total,each =length(levels(as.factor(AST_T2T3@meta.data[[resolution]])))))) 
+
+data <- mutate(data,Freq2 = data$Freq/data$totals) 
+data <- mutate(data,tissue = strsplit(as.character(data$IL08_condition.7), "_")) 
+data <- mutate(data, condition = unlist( lapply( X = data$tissue, FUN = "[[", FUN.VALUE = 3 ) ))
+data <- mutate(data, time = unlist( lapply( X = data$tissue, FUN = "[[", FUN.VALUE = 2 ) ))
+data <- mutate(data, time = factor(data$time,levels = c('Peak','Recovery'),labels = paste0(c('T2','T3'))))
+data <- mutate(data, IL08_condition.7 = factor(paste0(time,'_',condition)))
+#data <- mutate(data, RNA_snn_res.0.8 = paste0('Cluster_',RNA_snn_res.0.8))
+
+# new.order <- names(table(data$RNA_snn_res.0.8))
+# data <- mutate(data, RNA_snn_res.0.8 = factor(data$RNA_snn_res.0.8,levels = new.order[c(1,2,4,5,6,7,8,9,10,11,3)]))
+
+resolution <- "RNA_snn_res.0.3"
+data.sample <- AST_T2T3@meta.data %>% dplyr::select(RNA_snn_res.0.3,IL08_condition.9) %>% mutate(IL08_condition.9 = factor(IL08_condition.9)) %>% group_by(IL08_condition.9) %>%
+  table() %>% 
+  as.data.frame()
+
+ data.sample.list <- split(data.sample,data.sample$IL08_condition.9)
+ 
+total <- ''
+for(i in 1:length(data.sample.list)){
+  total[i] <- sum(data.sample.list[[i]]$Freq)
+}
+
+data.sample <- data.sample %>%
+  mutate(totals = as.numeric(rep(total,each =length(levels(as.factor(AST_T2T3@meta.data[[resolution]])))))) 
+
+data.sample <- mutate(data.sample,Freq2 = data.sample$Freq/data.sample$totals) 
+data.sample <- mutate(data.sample,tissue = strsplit(as.character(data.sample$IL08_condition.9), "_")) 
+data.sample <- mutate(data.sample, condition = factor(unlist( lapply( X = data.sample$tissue, FUN = "[[", FUN.VALUE = 3 ) )))
+data.sample <- mutate(data.sample, time = unlist( lapply( X = data.sample$tissue, FUN = "[[", FUN.VALUE = 2 ) ))
+data.sample <- mutate(data.sample, batch = unlist( lapply( X = data.sample$tissue, FUN = "[[", FUN.VALUE = 6 ) ))
+data.sample <- mutate(data.sample, tissue = unlist( lapply( X = data.sample$tissue, FUN = "[[", FUN.VALUE = 4 ) ))
+data.sample <- mutate(data.sample, time = factor(data.sample$time,levels = c('Peak','Recovery'),labels = paste0(c('T2','T3'))))
+data.sample <- mutate(data.sample, IL08_condition.8 = paste0(time,'_',condition,'_',tissue))
+data.sample <- mutate(data.sample, IL08_condition.7 = factor(paste0(time,'_',condition)))
+
+
+### PLOT #####
+########################################################################
+p.name <- 'counts.by.sample.ASTT2T3_res0.3'
+
+ggplot() + 
+geom_bar(data, mapping = aes(fill=RNA_snn_res.0.3, y=Freq2*100, x=IL08_condition.7),
+         position="dodge", stat="identity")  +
+  theme_minimal_hgrid() + 
+  theme(legend.background = element_rect(color = NA),
+        axis.text.x = element_text(angle = 60, hjust = 1),
+        plot.background = element_blank(),
+        rect = element_blank())+
+  ylab('Relative proportion (%)') + 
+ geom_dotplot(data= data.sample,mapping = aes(x = IL08_condition.7, y = Freq2*100),fill = 'white',dotsize = .75,binaxis='y', stackdir='center') + 
+  facet_wrap(RNA_snn_res.0.3~.,drop=TRUE,scales = 'free',ncol = 4) + 
+  NoLegend() 
+
+```
+
+## BCAS1 explore
+```{r}
+df <- VlnPlot(AST_T2T3,feature = "Bcas1",group.by = "RNA_snn_res.0.3", split.by = 'IL08_condition.7',pt.size =0.1,ncol = 1) + theme(text = element_text(size = 12)) + ylim(c(-1,5))
+df <- df$data %>% mutate(cat = paste0(split, "_", ident))
+
+ df.list <- split(df,df$cat)
+ 
+ total <- c()
+for(i in 1:length(df.list)){
+  total[i] <- as.numeric(length(which(df.list[[i]]$Bcas1 > 0)))
+}
+ 
+  total2 <- c()
+  prop <- c()
+for(i in 1:length(df.list)){
+  total2[i] <- as.numeric(length(df.list[[i]]$Bcas1))
+  prop[i] <- total[i]/total2[i]
+}
+  
+  
+```
+
+## New Vln Plot
+```{r fig.height=4, fig.width=5}
+markers <- ('Gfap')
+GeomSplitViolin <- ggproto("GeomSplitViolin", GeomViolin, draw_group = function(self, data, ..., draw_quantiles = NULL){
+  data <- transform(data, xminv = x - violinwidth * (x - xmin), xmaxv = x + violinwidth * (xmax - x))
+  grp <- data[1,'group']
+  newdata <- plyr::arrange(transform(data, x = if(grp%%2==1) xminv else xmaxv), if(grp%%2==1) y else -y)
+  newdata <- rbind(newdata[1, ], newdata, newdata[nrow(newdata), ], newdata[1, ])
+  newdata[c(1,nrow(newdata)-1,nrow(newdata)), 'x'] <- round(newdata[1, 'x']) 
+  if (length(draw_quantiles) > 0 & !scales::zero_range(range(data$y))) {
+    stopifnot(all(draw_quantiles >= 0), all(draw_quantiles <= 
+                                              1))
+    # quantiles <- ggplot2:::create_quantile_segment_frame(data, draw_quantiles)
+    # aesthetics <- data[rep(1, nrow(quantiles)), setdiff(names(data), c("x", "y")), drop = FALSE]
+    # aesthetics$alpha <- rep(1, nrow(quantiles))
+    # both <- cbind(quantiles, aesthetics)
+    # quantile_grob <- GeomPath$draw_panel(both, ...)
+    ggplot2:::ggname("geom_split_violin", grid::grobTree(GeomPolygon$draw_panel(newdata, ...)))
+  }
+  else {
+    ggplot2:::ggname("geom_split_violin", GeomPolygon$draw_panel(newdata, ...))
+  }
+})
+
+geom_split_violin <- function (mapping = NULL, data = NULL, stat = "ydensity", position = "identity", ..., draw_quantiles = NULL, trim = TRUE, scale = "area", na.rm = FALSE, show.legend = NA, inherit.aes = TRUE) {
+  layer(data = data, mapping = mapping, stat = stat, geom = GeomSplitViolin, position = position, show.legend = show.legend, inherit.aes = inherit.aes, params = list(trim = trim, scale = scale, draw_quantiles = draw_quantiles, na.rm = na.rm, ...))
+}
+
+mark_df.list <- list()
+for(ii in markers){
+  mark_df.list[[ii]] <- data.frame(expression = AST_T2T3[["RNA"]]@data[ii,], cluster =  AST_T2T3$RNA_snn_res.0.3[names(AST_T2T3[["RNA"]]@data[ii,])], marker = ii,cell.id = names(AST_T2T3[["RNA"]]@data[ii,]), condition = AST_T2T3$IL08_condition.2[names(AST_T2T3[["RNA"]]@data[ii,])], time =  AST_T2T3$IL08_condition.6[names(AST_T2T3[["RNA"]]@data[ii,])])
+}
+
+mark_df <- do.call(rbind, mark_df.list)
+
+
+ggplot(mark_df, aes(x = time, y = expression, fill=condition)) + 
+  geom_split_violin(trim = TRUE) + 
+  geom_boxplot(width = 0.25, notch = TRUE, notchwidth = .4, outlier.shape = NA, coef=0, alpha = 0) +
+  labs(x=NULL,y="Expression") +
+  theme_classic() +
+  theme(text = element_text(size = 20))  & facet_grid(marker~time) &   stat_summary(fun.y = mean, fun.ymin = mean, fun.ymax = mean,
+               geom = "crossbar", 
+               width = 0.25, size = 0.2,
+               position = position_dodge(width = .25))
+
+
+
+ggplot(mark_df, aes(x = time, y = expression, fill=condition)) + 
+  geom_split_violin(alpha = .6, trim = FALSE) +
+  stat_summary( show.legend = F, geom = "errorbar",
+               position = position_dodge(.25), size = 1,width = 0.15, fun.data = "mean_cl_normal",
+               fun.args = list(conf.int = .99)) +
+  scale_fill_brewer(palette = "Dark2", name = "Condition") + 
+  theme_minimal() & 
+  facet_grid(marker~.) & 
+  theme(text = element_text(size = 20)) 
+
+ggplot(mark_df, aes(x = cluster, y = expression, fill=condition)) + 
+  geom_split_violin(alpha = .6, trim = FALSE) +
+  stat_summary( show.legend = F, geom = "errorbar",
+               position = position_dodge(.25), size = 1,width = 0.15, fun.data = "mean_cl_normal",
+               fun.args = list(conf.int = .99)) +
+  scale_fill_brewer(palette = "Dark2", name = "Condition") + 
+  theme_minimal() & 
+ facet_grid(marker~time) & 
+  theme(text = element_text(size = 20)) 
+
+```
+ 
+```{r fig.height=4, fig.width=12}
+DimPlot(AST_T2T3, group.by = 'RNA_snn_res.0.3', label = T)| DimPlot(AST_T2T3, group.by = 'RNA_snn_res.1.2', label = T) |  DimPlot(AST_T2T3, group.by = 'RNA_snn_res.2', label = T)
+clustree(AST_T2T3,prefix = "RNA_snn_res." )
+```
+
+
+
+# 3d UMAP
+```{r}
+AST_T2T3.3d <- AST_T2T3  %>%
+    PercentageFeatureSet(pattern = "^mt-", col.name = "percent.mt") %>%
+    NormalizeData(normalization.method = "LogNormalize",verbose = FALSE,scale.factor = 10000) %>%
+    FindVariableFeatures(selection.method = "vst", nfeatures = 3000) %>%
+    ScaleData(verbose = FALSE) %>%
+    RunPCA(npcs = 50, verbose = FALSE) %>%
+    RunHarmony("IL01_uniqueID", plot_convergence = TRUE) %>%
+    RunUMAP(reduction = "harmony", dims = 1:6, min.dist=0.001, spread = 5,n.components = 3) %>% #1:5
+    FindNeighbors(reduction = "harmony", dims = 1:6) %>% #1:5
+    FindClusters(resolution = c(0.3,0.6,0.8,1.0,1.2)) %>%
+    identity()
+```
+
+```{r}
+DimPlot(AST_T2T3.3d)
+```
+
+# 3D umap using https://github.com/Dragonmasterx87/Interactive-3D-Plotting-in-Seurat-3.0.0/blob/master/3D%20UMAP%20Plotting%20v1.3.R code 
+```{r}
+library(plotly)
+
+# Visualize what headings are called so that you can extract them to form a dataframe
+Embeddings(object = AST_T2T3.3d, reduction = "umap")
+
+# Prepare a dataframe for cell plotting
+plot.data <- FetchData(object = AST_T2T3.3d, vars = c("UMAP_1", "UMAP_2", "UMAP_3", "RNA_snn_res.0.3"))
+
+# Make a column of row name identities (these will be your cell/barcode names)
+plot.data$label <- paste(rownames(plot.data))
+
+# Plot your data, in this example my Seurat object had 21 clusters (0-20)
+fig <- plot_ly(data = plot.data, 
+        x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, 
+        color = ~RNA_snn_res.0.3, 
+        type = "scatter3d", 
+        mode = "markers", 
+        marker = list(size = 5, width=2), # controls size of points
+        text=~label, #This is that extra column we made earlier for which we will use for cell ID
+        hoverinfo="text") #When you visualize your plotly object, hovering your mouse pointer over a point shows cell names
+
+
+# Updates stemming from Issue #9 Having a fixed scale on axes while selecting particular clusters
+# @rtoddler thanks for the suggestions!
+# Before you plot, set the ranges of the axis you desire. This set axis range will be 
+# present across all clusters, and plotly will not adjust for axis length anymore
+# this axis length will persist even when selecting some clusters
+
+# xaxis
+axx <- list(
+  nticks = 4,
+  range = c(-20,20) #select range of xaxis
+)
+
+# yaxis
+axy <- list(
+  nticks = 4,
+  range = c(-20,20) #select range of yaxis
+)
+
+#zaxis
+axz <- list(
+  nticks = 4,
+  range = c(-20,20) #select range of zaxis
+)
+
+fig <- fig %>% layout(scene = list(xaxis=axx,yaxis=axy,zaxis=axz))
+fig_cube <- fig %>% layout(scene = list(xaxis=axx,yaxis=axy,zaxis=axz, aspectmode='cube')) # To maintain cubic aspect
+fig
+fig_cube
+
+```
+```{r}
+goi <- c("Vim","Gfap")
+plotting.data <- FetchData(object = AST_T2T3.3d, vars = c("UMAP_1", "UMAP_2", "UMAP_3", "Expression"=goi), slot = 'data') %>%  pivot_longer(cols = goi, names_to = 'Marker')
+plotting.data <- mutate(plotting.data,Marker = factor(Marker)) %>% split(f = plotting.data$Marker)
+
+
+to.plot <- plotting.data[['Gfap']]
+
+Cutoff <- quantile(to.plot$value, probs = .95)
+to.plot$"ExprCutoff" <- ifelse(test = to.plot$value <Cutoff, yes = to.plot$value, no = Cutoff)
+
+# Add the label column, so that now the column has 'cellname-its expression value'
+to.plot$label <- paste(rownames(to.plot)," - ", to.plot$Marker, sep="")
+
+
+# Plot your data, in this example my Seurat object had 21 clusters (0-20), and cells express a gene called ACTB
+plot_ly(data = to.plot,
+        # name = goi,
+        x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, 
+        color = ~ExprCutoff, # you can just run this against the column for the gene as well using ~ACTB, the algorith will automatically scale in that case based on maximal and minimal values
+        opacity = .5,
+        colors = c('grey90',paste0('#',c("4FB3AA","e9d8a6","ee9b00","ae2012"))), 
+        type = "scatter3d", 
+        mode = "markers",
+        marker = list(size = 1.5), 
+        text=~label,
+        hoverinfo="text"
+) %>%layout(title=goi)
+
+```
