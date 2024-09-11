@@ -1,0 +1,47 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+ DimPlot(IMM_T2T3, group.by = 'RNA_snn_res.0.6', split.by = 'IL08_condition.7', label = T,ncol = 2) + NoAxes()
+```
+
+```{r}
+library(dplyr)
+table.condition <- IMM_T2T3@meta.data %>%
+    group_by(IL08_condition.7) %>%
+    dplyr::summarize(count=n()) %>%
+  as.data.frame()
+
+
+library(dplyr)
+table.cluster <- IMM_T2T3@meta.data %>%
+    group_by(IL08_condition.7,RNA_snn_res.0.6) %>%
+    dplyr::summarize(count=n()) %>%
+  as.data.frame()
+
+table.cluster <- mutate(table.cluster,
+                  total = table.condition$count[match(table.cluster[,'IL08_condition.7'],table.condition[,'IL08_condition.7'])]) %>% 
+                 mutate(table.cluster,prop = table.cluster$count/ table.cluster$total) %>%
+                 mutate(pct = prop * 100)
+table.cluster <- mutate(table.cluster,tissue = strsplit(as.character(table.cluster$IL08_condition.7), "_")) 
+table.cluster <- mutate(table.cluster, condition = unlist( lapply( X = table.cluster$tissue, FUN = "[[", FUN.VALUE = 3 ) ))
+table.cluster <- mutate(table.cluster, time = unlist( lapply( X = table.cluster$tissue, FUN = "[[", FUN.VALUE = 2 ) ))
+table.cluster <- mutate(table.cluster, time = factor(table.cluster$time,levels = c('Onset','Peak','Recovery','LateOnset'),labels = paste0(c('T1','T2','T3','T4'))))
+table.cluster <- mutate(table.cluster, IL08_condition.8 = paste0(time,'_',condition,'_',tissue))
+table.cluster <- mutate(table.cluster, IL08_condition.7 = paste0(time,'_',condition))
+
+```
+
+```{r fig.height=6, fig.width=6}
+
+ggplot(data=table.cluster, aes(x=time, y=pct, fill = condition)) &
+  geom_bar(stat="identity", width=0.5, position =position_dodge(), color = 'grey40', size = 0.1) &
+  scale_fill_brewer(palette="Reds")  & 
+  facet_wrap(~ RNA_snn_res.0.6, scales = 'free') & 
+  theme_minimal_hgrid() & 
+  rotate_x_text(60) & ylab('Percent (%)') & 
+  xlab('Time point')
+           
+```

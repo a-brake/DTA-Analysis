@@ -2,7 +2,7 @@
 title: "R Notebook"
 output: html_notebook
 ---
-```{r message = FALSE, error = FALSE, warning = FALSE,results= 'hide'}
+```{r error=FALSE, message=FALSE, warning=FALSE, results=}
 library(dplyr)
 library(clustree)
 library(Seurat)
@@ -49,6 +49,8 @@ library(moonBook)
 library(ggforce)
 library(yarrr)
 library(clustree)
+library(scCustomize)
+
 
 set.seed(1) 
 
@@ -100,7 +102,7 @@ OneDrive_PDF.PNG <- function(p.name){
 ```{r}
 
 FPlist <- function(seuratobj,genes){
-    FeaturePlot(seuratobj, genes ,ncol = n.col,cols = c('grey90',paste0('#',c("4FB3AA","e9d8a6","ee9b00","ae2012"))),pt.size = 0.05, order = order.input) & NoAxes() 
+    FeaturePlot_scCustom(seuratobj, genes ,num_columns = n.col,colors_use  = c('grey90',paste0('#',c("4FB3AA","e9d8a6","ee9b00","ae2012"))),pt.size = 0.05, order = order.input) & NoAxes() 
 } #function to plot markers for each cluster 
 
 
@@ -183,6 +185,8 @@ feat <- VlnPlot(seuratobj,feature = "nFeature_RNA",group.by = resolution,pt.size
 ```{r}
 IMM <- readRDS('/Users/brakeam/Library/CloudStorage/OneDrive-NationalInstitutesofHealth/JP & Alexis/20240419_newDTA/1_data.input/1_DTA/Cleaned/IMM_all_cleaned_20220427.RDS')
 ```
+
+
 ```{r fig.height=8, fig.width=18}
 DimPlot(IMM)
 DimPlot(IMM, split.by = 'IL08_condition.7',pt.size = 0.05,ncol = 4) & NoAxes()
@@ -194,17 +198,22 @@ IMM_T2T3_T1234umap <- subset(IMM, subset = IL08_condition.6 %in% c("T2_Peak","T3
 ```
 # Basic seurat pipeine
 ```{r}
-IMM_T2T3 <- IMM_T2T3_T1234umap   %>%
-    PercentageFeatureSet(pattern = "^mt-", col.name = "percent.mt") %>%
-    NormalizeData(normalization.method = "LogNormalize",verbose = FALSE,scale.factor = 10000) %>%
-    FindVariableFeatures(selection.method = "vst", nfeatures = 3000) %>%
-    ScaleData(verbose = FALSE) %>%
-    RunPCA(npcs = 50, verbose = FALSE) %>%
-    RunHarmony("IL01_uniqueID", plot_convergence = TRUE) %>%
-    RunUMAP(reduction = "harmony", dims = 1:6, min.dist=0.001, spread = 5,n.components = 2) %>% #1:5
-    FindNeighbors(reduction = "harmony", dims = 1:6) %>% #1:5
-    FindClusters(resolution = c(0.2, 0.3, 0.6, 0.8, 1.0, 1.2, 1.6)) %>%
-    identity()
+set.seed(0)
+# IMM_T2T3 <- IMM_T2T3_T1234umap   %>%
+#     PercentageFeatureSet(pattern = "^mt-", col.name = "percent.mt") %>%
+#     NormalizeData(normalization.method = "LogNormalize",verbose = FALSE,scale.factor = 10000) %>%
+#     FindVariableFeatures(selection.method = "vst", nfeatures = 3000) %>%
+#     ScaleData(verbose = FALSE) %>%
+#     RunPCA(npcs = 50, verbose = FALSE) %>%
+#     RunHarmony("IL01_uniqueID", plot_convergence = TRUE) %>%
+#     RunUMAP(reduction = "harmony", dims = 1:6, min.dist=0.001, spread = 5,n.components = 2) %>% #1:5
+#     FindNeighbors(reduction = "harmony", dims = 1:6) %>% #1:5
+#     FindClusters(resolution = c(0.2, 0.3, 0.6, 0.8, 1.0, 1.2, 1.6)) %>%
+#     identity()
+
+
+IMM_T2T3 <- readRDS('/Users/brakeam/Library/CloudStorage/OneDrive-NationalInstitutesofHealth/JP & Alexis/20240419_newDTA/1_data.input/1_DTA/PreCleaning_T2T3/IMM_T2T3_20240726.RDS')
+   
 ```
 # Dimplot with various grouping
 ```{r fig.height=9, fig.width=15}
@@ -260,60 +269,109 @@ QCplot(IMM_T2T3, resolution = 'RNA_snn_res.0.6')
 # Markers
 ## Find Markers res.0.3
 ```{r Find markers}
-Idents(IMM_T2T3) <- IMM_T2T3$RNA_snn_res.0.3
-
-clusters <- as.list(levels(Idents(IMM_T2T3)))
-
-# find markers 
-#markers_T2T3_res0.3 <- lapply(clusters, FindMarkers,object = IMM_T2T3)
-#names(markers_T2T3_res0.3) <- paste0('RNA_snn_res.0.3_c',levels(Idents(IMM_T2T3))) #rename the list items to match the cluster numbers
-#markers_T2T3_res0.3
-
-### Save marker data 
-# saveRDS(markers_T2T3_res0.3, '/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_AllMarkers_Res0.3_20240614.rds')
-
- # write.xlsx(markers_T2T3_res0.3,  paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/11_ASTReanalysis/AST_T2T3_AllMarkers_Res0.3_',
- #           format(Sys.Date(), "%Y%m%d"),
- #           '.xlsx'), rowNames = TRUE)
+# Idents(IMM_T2T3) <- IMM_T2T3$RNA_snn_res.0.3
+# 
+# clusters <- as.list(levels(Idents(IMM_T2T3)))
+# 
+# #find markers
+# markers_T2T3_res0.3 <- lapply(clusters, FindMarkers,object = IMM_T2T3)
+# names(markers_T2T3_res0.3) <- paste0('RNA_snn_res.0.3_c',levels(Idents(IMM_T2T3))) #rename the list items to match the cluster numbers
+# markers_T2T3_res0.3
+# 
+# ### Save marker data
+#  saveRDS(markers_T2T3_res0.3, '/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_AllMarkers_Res0.3_20240614.rds')
+# 
+# write.xlsx(markers_T2T3_res0.3,  paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/11_ASTReanalysis/AST_T2T3_AllMarkers_Res0.3_',
+#  #           format(Sys.Date(), "%Y%m%d"),
+#  #           '.xlsx'), rowNames = TRUE)
  
 ########################################## Read marker data ########################################## 
  markers_T2T3_res0.3 <-  readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_AllMarkers_Res0.3_20240501.rds')
 ```
+
+## Find Markers res.0.6
+```{r Find markers}
+Idents(IMM_T2T3) <- IMM_T2T3$RNA_snn_res.0.6
+
+clusters <- as.list(levels(Idents(IMM_T2T3)))
+
+#find markers
+markers_T2T3_res0.6 <- lapply(clusters, FindMarkers,object = IMM_T2T3)
+names(markers_T2T3_res0.6) <- paste0('RNA_snn_res.0.6_c',levels(Idents(IMM_T2T3))) #rename the list items to match the cluster numbers
+markers_T2T3_res0.6
+
+### Save marker data
+ saveRDS(markers_T2T3_res0.6, paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_AllMarkers_Res0.6_',
+           format(Sys.Date(), "%Y%m%d"),'.rds'))
+
+write.xlsx(markers_T2T3_res0.6,  paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_AllMarkers_Res0.6_',
+           format(Sys.Date(), "%Y%m%d"),
+            '.xlsx'), rowNames = TRUE)
+ 
+########################################## Read marker data ########################################## 
+#markers_T2T3_res0.3 <-  readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/AST/AST_T2T3_AllMarkers_Res0.6_20240910.rds')
+```
+
+## Find Markers res.0.6 c0 vs 2
+```{r Find markers}
+Idents(IMM_T2T3) <- IMM_T2T3$RNA_snn_res.0.6
+
+clusters <- as.list(levels(Idents(IMM_T2T3)))
+
+#find markers
+markers_T2T3_res0.6_c0v2 <- FindMarkers(object = IMM_T2T3, ident.1 = 0, ident.2 = 2) %>% list()
+names(markers_T2T3_res0.6_c0v2) <- paste0('RNA_snn_res.0.6_c',c('0vs2')) #rename the list items to match the cluster numbers
+markers_T2T3_res0.6_c0v2
+
+### Save marker data
+ saveRDS(markers_T2T3_res0.6_c0v2, paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_AllMarkers_Res0.6_c0v2',
+           format(Sys.Date(), "%Y%m%d"),'.rds'))
+
+write.xlsx(markers_T2T3_res0.6_c0v2,  paste0('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/IMM_T2T3_AllMarkers_Res0.6_c0v2',
+           format(Sys.Date(), "%Y%m%d"),
+            '.xlsx'), rowNames = TRUE)
+ 
+########################################## Read marker data ########################################## 
+#markers_T2T3_res0.6_c0v2 <-  readRDS('')
+```
+
 ### Feature plot
-```{r plot top10 markers for each cluster, fig.height=25, fig.width=20}
-#top_markers_T2T3_res0.3 <- lapply(markers_T2T3_res0.3, filter, pct.1 >= 0.75) # filter by upper and lower cutoff for pct1 and pct2
+```{r plot top10 markers for each cluster, fig.height=4, fig.width=20}
+top10_markers <- lapply(markers_T2T3_res0.6_c0v2, filter, pct.1 <0.5, pct.2 >0.5) # filter by upper and lower cutoff for pct1 and pct2
 
 # use apply to select top 10 markers from each list item
-top10_markers_res0.3 <-  lapply(markers_T2T3_res0.3, head, 10)
+#top10_markers <-  lapply(markers_T2T3_res0.6, head, 60)
 
 #markers.to.exp(top10_markers_res0.3,'top10_markers_res0.3')
 
-top10_markers_res0.3.toplot <- rmDup(top10_markers_res0.3)
+top10_markers.toplot <- rmDup(top10_markers)
 
 ## FEATURE PLOT ##
-n.col = 2 
+n.col = 6
 order.input <- T
 
-fp <- lapply(seuratobj = IMM_T2T3, X = top10_markers_res0.3.toplot[[2]], FUN = FPlist)
+fp <- lapply(seuratobj = IMM_T2T3, X = top10_markers.toplot[[2]], FUN = FPlist)
 
-rel.height <- ceil(as.numeric(lapply(top10_markers_res0.3.toplot, length))/n.col) 
+rel.height <- ceil(as.numeric(lapply(top10_markers.toplot, length))/n.col) 
 
-p.name <- 'FeaturePlot_ASTT2T3_RNA_snn_res.0.3_top10' # to use for export
+p.name <- 'FeaturePlot_IMMT2T3_RNA_snn_res.0.6' # to use for export
 
-plot_grid(plotlist = fp, ncol = 3, rel_heights = rel.height, labels = paste0('Cluster ', names(fp)), label_colour = '#ae2012', vjust = 1.05, label_size = 16, scale = 0.95) #merge plots for all clusters into one big figure for export
+plot_grid(plotlist = fp, ncol = 1, rel_heights = rel.height, labels = paste0('Cluster ', names(fp)), label_colour = '#ae2012', vjust = 1.05, label_size = 16, scale = 0.95) #merge plots for all clusters into one big figure for export
  
+top10_markers.toplot[[2]]
+
 ```
 ### Dotplot
-```{r fig.height=10, fig.width=15}
+```{r fig.height=15, fig.width=8}
 ## DOT PLOT ##
-resolution = 'RNA_snn_res.0.3'
+resolution = 'RNA_snn_res.0.6'
 
-dp <- lapply(seuratobj = IMM_T2T3, X = top10_markers_res0.3.toplot[[2]], DPlist)
+dp <- lapply(seuratobj = IMM_T2T3, X = top10_markers.toplot[[2]], DPlist, resolution = resolution)
 
-rel.height <- as.numeric(lapply(top10_markers_res0.3.toplot[[2]], length)) #take the expected number of rows and based on length of markers for each cluster and the number of columns
+#rel.height <- as.numeric(lapply(top10_markers.toplot[[2]], length)) #take the expected number of rows and based on length of markers for each cluster and the number of columns
 
-p.name <- 'FeaturePlot_IMMT2T3_RNA_snn_res.0.3_top10' # to use for export
- plot_grid(plotlist = dp, ncol = 3, rel_heights = rel.height, labels = paste0('Cluster ', names(dp)), label_colour = '#ae2012', vjust = 1.0, label_size = 16, scale = 0.85, axis = 'l') #merge plots for all clusters into one big figure for export
+p.name <- 'FeaturePlot_IMMT2T3_RNA_snn_res.0.6_top10' # to use for export
+ plot_grid(plotlist = dp, ncol = 1, rel_heights = 1, labels = paste0('Cluster ', names(dp)), label_colour = '#ae2012', vjust = 1.0, label_size = 16, scale = 0.85, axis = 'l') #merge plots for all clusters into one big figure for export
 
 ```
 ### Plot all markers 
@@ -350,6 +408,8 @@ markers <- c('Fgf13', 'Lyst', 'Itgax','Fth1','Fau' ,'Siglech', 'P2ry12','Selplg'
 # Save object
 ```{r}
 saveRDS(IMM_T2T3,'/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/1_data.input/1_DTA/PreCleaning_T2T3/IMM_T2T3_20240726.RDS' ) # This object is pre-manual doublet removal
+
+IMM_T2T3 <- readRDS('/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/1_data.input/1_DTA/PreCleaning_T2T3/IMM_T2T3_20240726.RDS')
 ```
 
 --- 
@@ -357,22 +417,22 @@ saveRDS(IMM_T2T3,'/Users/brakeam/OneDrive - National Institutes of Health/JP & A
 
 ## Subset 
 ```{r}
-IMM_T2T3.sub <- subset(IMM_T2T3, RNA_snn_res.0.6 %in% c(11) ,invert = T )
-
+#IMM_T2T3.sub <- subset(IMM_T2T3, RNA_snn_res.0.6 %in% c(11) ,invert = T )
+IMM_T2T3.sub <- readRDS('/Users/brakeam/Library/CloudStorage/OneDrive-NationalInstitutesofHealth/JP & Alexis/20240419_newDTA/1_data.input/1_DTA/Cleaned_T2T3only/IMM_T2T3_cleaned_20240804.RDS')
 ```
 ## Basic seurat pipeine
 ```{r}
-IMM_T2T3.sub <- IMM_T2T3.sub   %>%
-    PercentageFeatureSet(pattern = "^mt-", col.name = "percent.mt") %>%
-    NormalizeData(normalization.method = "LogNormalize",verbose = FALSE,scale.factor = 10000) %>%
-    FindVariableFeatures(selection.method = "vst", nfeatures = 3000) %>%
-    ScaleData(verbose = FALSE) %>%
-    RunPCA(npcs = 50, verbose = FALSE) %>%
-    RunHarmony("IL01_uniqueID", plot_convergence = TRUE) %>%
-    RunUMAP(reduction = "harmony", dims = 1:8, min.dist=0.001, spread = 5,n.components = 2) %>% #1:5
-    FindNeighbors(reduction = "harmony", dims = 1:8) %>% #1:5
-    FindClusters(resolution = c(0.2, 0.3, 0.6, 0.7, 0.8, 1.0, 1.2, 1.6)) %>% #0.2, 0.3, 0.6, 0.8, 1.0, 1.2, 1.6
-    identity()
+# IMM_T2T3.sub <- IMM_T2T3.sub   %>%
+#     PercentageFeatureSet(pattern = "^mt-", col.name = "percent.mt") %>%
+#     NormalizeData(normalization.method = "LogNormalize",verbose = FALSE,scale.factor = 10000) %>%
+#     FindVariableFeatures(selection.method = "vst", nfeatures = 3000) %>%
+#     ScaleData(verbose = FALSE) %>%
+#     RunPCA(npcs = 50, verbose = FALSE) %>%
+#     RunHarmony("IL01_uniqueID", plot_convergence = TRUE) %>%
+#     RunUMAP(reduction = "harmony", dims = 1:8, min.dist=0.001, spread = 5,n.components = 2) %>% #1:5
+#     FindNeighbors(reduction = "harmony", dims = 1:8) %>% #1:5
+#     FindClusters(resolution = c(0.2, 0.3, 0.6, 0.7, 0.8, 1.0, 1.2, 1.6)) %>% #0.2, 0.3, 0.6, 0.8, 1.0, 1.2, 1.6
+#     identity()
 ```
 ## Dim plot multiple resolutions
 ```{r fig.height=3, fig.width=12}
@@ -457,7 +517,7 @@ FPlist(genes = JP_EAE_markers, seuratobj = IMM_T2T3.sub )
 ```
 
 # Transfer clustering labels from IMM_T2T3 to IMM_T2T3.sub
-```{r Transfer clustering labels from IMM to T2T3, fig.height=7, fig.width=10}
+```{r Transfer clustering labels from IMM to T2T3, fig.height=10, fig.width=13}
 
 index <- match(colnames(IMM_T2T3.sub),colnames(IMM_T2T3)) #match(source)
 
@@ -492,7 +552,7 @@ which(test == 'FALSE') #all true
 # Convert back to a factor
 IMM_T2T3.sub$IMM_IL15_annotation.res0.6.presubset <- as.factor(IMM_T2T3.sub$IMM_IL15_annotation.res0.6.presubset)
 
-((DimPlot(IMM_T2T3.sub, group.by = "IMM_IL15_annotation.res0.6.presubset",label = F) + labs(title = 'IMM_IL15_annotation.res0.6.presubset'))| (DimPlot(IMM_T2T3, group.by = "RNA_snn_res.0.7", label = T, repel = T)+ labs(title = 'RNA_snn_res.0.6')) )/((DimPlot(IMM_T2T3.sub, group.by = "IMM_IL15_annotation.res0.6.short2") + labs(title = 'IMM_IL15_annotation.res0.6.short2'))| (DimPlot(IMM_T2T3, group.by = "IMM_IL15_annotation.res0.6.short2", label = F, repel = T)+ labs(title = 'IMM_IL15_annotation.res0.6.short2')) )
+((DimPlot(IMM_T2T3.sub, group.by = "IMM_IL15_annotation.res0.6.presubset",label = F) + labs(title = 'IMM_IL15_annotation.res0.6.presubset'))| (DimPlot(IMM_T2T3, group.by = "RNA_snn_res.0.6", label = T, repel = T)+ labs(title = 'RNA_snn_res.0.6')) )/((DimPlot(IMM_T2T3.sub, group.by = "IMM_IL15_annotation.res0.6.short2") + labs(title = 'IMM_IL15_annotation.res0.6.short2'))| (DimPlot(IMM_T2T3, group.by = "IMM_IL15_annotation.res0.6.short2", label = F, repel = T)+ labs(title = 'IMM_IL15_annotation.res0.6.short2')) )
 ```
 
 ## Determine where each annotation tracks in comparison to ACTRIMS annotation in the new object
@@ -584,7 +644,7 @@ DPlist(seuratobj = IMM_T2T3.sub,genes = genes,resolution <- 'RNA_snn_res.0.6')
 
 ```
 
-
+# QC plot
 ```{r}
 QCplot(seuratobj = IMM_T2T3.sub,resolution = 'RNA_snn_res.0.6')
 ```
@@ -593,8 +653,8 @@ QCplot(seuratobj = IMM_T2T3.sub,resolution = 'RNA_snn_res.0.6')
 ```{r}
 n.col = 3
 order.input = T
-FPlist(seuratobj = IMM_T2T3.sub, genes = c('Gm10790', 'mt-Co2,', 'Ifi203', 'Snhg11','Top2a','Sox11','Fmn1'))
-FPlist(seuratobj = IMM_T2T3.sub, genes = c('Apoe', 'Igf1', 'Lilrb4', 'Lyz2', 'Colec12', 'Msr1',  'Map1lc3b')) #  shown to be part of the phagocytic signature in adult cerebellar microglia 
+FPlist(seuratobj = IMM_T2T3, genes = c('Gm10790', 'mt-Co2,', 'Ifi203', 'Snhg11','Top2a','Sox11','Fmn1'))
+FPlist(seuratobj = IMM_T2T3, genes = c('Apoe', 'Igf1', 'Lilrb4', 'Lyz2', 'Colec12', 'Msr1',  'Map1lc3b')) #  shown to be part of the phagocytic signature in adult cerebellar microglia 
 ```
 
 # Plot markers from MapMyCells run (pre subset)
@@ -642,4 +702,78 @@ rel.height <- as.numeric(lapply(Allen.marker.list.unique, length)) #take the exp
 # Export IMM_T2T3.sub which is the reclustered object with res0.6 cluster removed
 ```{r}
 saveRDS(IMM_T2T3.sub,'/Users/brakeam/OneDrive - National Institutes of Health/JP & Alexis/20240419_newDTA/1_data.input/1_DTA/Cleaned/IMM_T2_cleaned_20240804.RDS')
+```
+
+# Transfer labels from  IMM_T2T3 to IMM_T2T3.sub
+```{r Transfer clustering labels from IMM to T2T3, fig.height=7, fig.width=10}
+
+index <- match(colnames(IMM_T2T3.sub),colnames(IMM_T2T3)) #match(source)
+
+#Is index the right size? yes 
+length(index) == length(colnames(IMM_T2T3.sub))#TRUE
+
+# Does the index reflect the position of each cell from the subset in the merged object? yes
+test <- colnames(IMM_T2T3.sub) == colnames(IMM_T2T3)[index] 
+which(test == 'FALSE') #all true 
+
+#transfer labels
+IMM_T2T3.sub$IMM_IL15_annotation.res0.6.presubset <- ''
+IMM_T2T3.sub$IMM_IL15_annotation.res0.6.presubset <-  paste0(str_pad(as.character(IMM_T2T3$RNA_snn_res.0.6)[index], 2, pad = "0"),'_IMM_T2T3_presub')
+
+IMM_T2T3.sub$IMM_IL15_annotation.res0.6.presubsetPASTE <- ''
+IMM_T2T3.sub$IMM_IL15_annotation.res0.6.presubsetPASTE <-  paste0(str_pad(as.character(IMM_T2T3$RNA_snn_res.0.6)[index], 2, pad = "0"),'_',str_pad(as.character(IMM_T2T3.sub$RNA_snn_res.0.6)[index], 2, pad = "0"))
+
+IMM_T2T3.sub$IMM_IL15_annotation.res0.6.presubsetPASTEres7 <- ''
+IMM_T2T3.sub$IMM_IL15_annotation.res0.6.presubsetPASTEres7 <-  paste0(str_pad(as.character(IMM_T2T3$RNA_snn_res.0.6)[index], 2, pad = "0"),'_',str_pad(as.character(IMM_T2T3.sub$RNA_snn_res.0.7)[index], 2, pad = "0"))
+
+
+#Was transfer successful? 
+
+  ## yes all counts match up
+table(IMM_T2T3.sub$IMM_IL15_annotation.res0.6.presubset) #Merged object
+table(IMM_T2T3$RNA_snn_res.0.7) #Labels that were transferred in the subset object
+
+  ## are the correct cells labeled?
+test <- IMM_T2T3.sub$IMM_IL15_annotation.res0.6.presubset== IMM_T2T3$RNA_snn_res.0.6[index]  # are those cells given the same name in both objects?
+which(test == 'FALSE') #all true 
+
+# Convert back to a factor
+IMM_T2T3.sub$IMM_IL15_annotation.res0.6.presubset <- as.factor(IMM_T2T3.sub$IMM_IL15_annotation.res0.6.presubset)
+
+((DimPlot(IMM_T2T3.sub, group.by = "IMM_IL15_annotation.res0.6.presubset",label = F) + labs(title = 'IMM_IL15_annotation.res0.6.presubset'))| (DimPlot(IMM_T2T3, group.by = "RNA_snn_res.0.7", label = T, repel = T)+ labs(title = 'RNA_snn_res.0.6')) )/((DimPlot(IMM_T2T3.sub, group.by = "IMM_IL15_annotation.res0.6.short2") + labs(title = 'IMM_IL15_annotation.res0.6.short2'))| (DimPlot(IMM_T2T3, group.by = "IMM_IL15_annotation.res0.6.short2", label = F, repel = T)+ labs(title = 'IMM_IL15_annotation.res0.6.short2')) )
+```           
+
+## Overlay annotation confidence scores from presubset object to sub object to see if small clusters are low confidence 
+```{r read library mapping results}
+mapping <- read.csv("/Users/brakeam/Library/CloudStorage/OneDrive-NationalInstitutesofHealth/JP & Alexis/20240419_newDTA/6_AnalysisOutput/IMM/MapMyCells/IMM_T2T3_10xWholeMouseBrain(CCN20230722)_HierarchicalMapping_UTC_1722307615263/IMM_T2T3_10xWholeMouseBrain(CCN20230722)_HierarchicalMapping_UTC_1722307615263.csv",comment.char="#")
+head(data.frame(mapping))
+
+```
+```{r define modified mapping, warning=FALSE}
+# Assign rare classes and subclasses as "other"
+mapping$class_new <- mapping$class_name
+ mapping$class_new[!is.element(mapping$class_name,names(head(-sort(-table(mapping$class_name)),5)))] = "other"
+ mapping$class_new[which(mapping$class_bootstrapping_probability <.70)] = "Probability < 0.70"
+
+mapping$subclass_new <- mapping$subclass_name
+mapping$subclass_new[!is.element(mapping$subclass_name,names(head(-sort(-table(mapping$subclass_name)),20)))] = "other"
+mapping$subclass_new[which(mapping$subclass_bootstrapping_probability <.70)] = "Probability < 0.70"
+
+mapping$supertype_new <- mapping$supertype_name
+mapping$supertype_new[!is.element(mapping$supertype_name,names(head(-sort(-table(mapping$supertype_name)),6)))] = "other"
+mapping$supertype_new[which(mapping$supertype_bootstrapping_probability <.70)] = "Probability < 0.70"
+
+# Put row.names as data colnames and the order to match the data
+rownames(mapping) <- mapping$cell_id
+mapping <- mapping[colnames(IMM_T2T3.sub@assays[["RNA"]]@counts),]
+
+# Create the Seurat object
+dataSeurat <- IMM_T2T3.sub
+dataSeurat@meta.data <- cbind(IMM_T2T3.sub@meta.data,mapping)
+```   
+```{r fig.height=4, fig.width=9}
+FeaturePlot(dataSeurat,features = c('class_bootstrapping_probability'),cols = c("#ae2012",'grey90'),blend= F, pt.size = 0.2) &NoAxes() | FeaturePlot(dataSeurat,features = c('subclass_bootstrapping_probability'),cols = c("#ae2012",'grey90'),blend= F, pt.size = 0.2) &NoAxes()
+```
+```{r fig.height=4, fig.width=10}
+DimPlot(dataSeurat, group.by="subclass_new", label=F, repel = T, ncol = 1, pt.size =.25) + NoAxes() 
 ```

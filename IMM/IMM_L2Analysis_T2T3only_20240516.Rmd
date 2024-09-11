@@ -50,8 +50,6 @@ library(ggforce)
 library(yarrr)
 library(clustree)
 
-set.seed(1) 
-
  basic.marker1 <- c( "Lepr", "Cemip", "Mag", "Pdgfra", "Gfap", "Slc1a2", "Ptprc", "Syt1", "Nrg1", "ç", "Cux2", 'S100a8','Gad1', 'Slc17a7', 'Flt1', "Mbp", 'Plp1','Tmem119', 'P2ry12', 'Trem2', 'Itgam', 'Itgax', 'Mecom', 'Pdgfrb', 'Acta2', 'Apoe', 'Top2a', 'Enpp6', 'Cspg4','Cd14')
 
 colorsp.new <- colorRampPalette(paste0('#',c("f7b99b","e88da0","73c9e8","b1d29d","f9d28b","72b6e4")))
@@ -201,8 +199,8 @@ IMM_T2T3 <- IMM_T2T3_T1234umap   %>%
     ScaleData(verbose = FALSE) %>%
     RunPCA(npcs = 50, verbose = FALSE) %>%
     RunHarmony("IL01_uniqueID", plot_convergence = TRUE) %>%
-    RunUMAP(reduction = "harmony", dims = 1:6, min.dist=0.001, spread = 5,n.components = 2) %>% #1:5
-    FindNeighbors(reduction = "harmony", dims = 1:6) %>% #1:5
+    RunUMAP(reduction = "harmony", dims = 1:8, min.dist=0.001, spread = 5,n.components = 2) %>% #1:5
+    FindNeighbors(reduction = "harmony", dims = 1:8) %>% #1:5
     FindClusters(resolution = c(0.2, 0.3, 0.6, 0.8, 1.0, 1.2, 1.6)) %>%
     identity()
 ```
